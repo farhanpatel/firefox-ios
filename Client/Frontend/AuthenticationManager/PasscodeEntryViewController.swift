@@ -17,6 +17,9 @@ class PasscodeEntryViewController: UIViewController {
     weak var delegate: PasscodeEntryDelegate?
     private let passcodePane = PasscodePane()
     private var authenticationInfo: AuthenticationKeychainInfo?
+    private var keyboardIntersectionHeight: CGFloat?
+    private var errorToast: ErrorToast?
+    private let errorPadding: CGFloat = 10
 
     init() {
         self.authenticationInfo = KeychainWrapper.authenticationInfo()
@@ -38,6 +41,7 @@ class PasscodeEntryViewController: UIViewController {
             make.bottom.left.right.equalTo(self.view)
             make.top.equalTo(self.snp_topLayoutGuideBottom)
         }
+        KeyboardHelper.defaultHelper.addDelegate(self)
     }
 
     override func viewWillAppear(animated: Bool) {
@@ -65,8 +69,37 @@ extension PasscodeEntryViewController: PasscodeInputViewDelegate {
             KeychainWrapper.setAuthenticationInfo(authenticationInfo)
             delegate?.passcodeValidationDidSucceed()
         } else {
-            // TODO: Show error for incorrect passcode
+            displayError("Incorrect passcode. Try again.")
             passcodePane.codeInputView.resetCode()
         }
     }
+
+    private func displayError(text: String) {
+        guard let keyboardSpace = keyboardIntersectionHeight else {
+            return
+        }
+
+        errorToast?.removeFromSuperview()
+        errorToast = {
+            let toast = ErrorToast()
+            toast.textLabel.text = text
+            view.addSubview(toast)
+            toast.snp_makeConstraints { make in
+                make.centerX.equalTo(self.view)
+                make.bottom.equalTo(self.view).offset(-(keyboardSpace + errorPadding))
+                make.left.greaterThanOrEqualTo(self.view).offset(errorPadding)
+                make.right.lessThanOrEqualTo(self.view).offset(-errorPadding)
+            }
+            return toast
+        }()
+    }
+}
+
+extension PasscodeEntryViewController: KeyboardHelperDelegate {
+    func keyboardHelper(keyboardHelper: KeyboardHelper, keyboardDidShowWithState state: KeyboardState) {
+        keyboardIntersectionHeight = state.intersectionHeightForView(self.view)
+    }
+
+    func keyboardHelper(keyboardHelper: KeyboardHelper, keyboardWillHideWithState state: KeyboardState) {}
+    func keyboardHelper(keyboardHelper: KeyboardHelper, keyboardWillShowWithState state: KeyboardState) {}
 }

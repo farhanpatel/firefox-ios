@@ -35,6 +35,9 @@ class PasscodeConfirmViewController: UIViewController {
 
     private let confirmAction: PasscodeConfirmAction
     private var authenticationInfo: AuthenticationKeychainInfo?
+    private var keyboardIntersectionHeight: CGFloat?
+    private var errorToast: ErrorToast?
+    private let errorPadding: CGFloat = 10
 
     class func newPasscodeVC() -> PasscodeConfirmViewController {
         let passcodeVC = PasscodeConfirmViewController(confirmAction: .Created)
@@ -75,6 +78,7 @@ class PasscodeConfirmViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        KeyboardHelper.defaultHelper.addDelegate(self)
         view.backgroundColor = UIConstants.TableViewHeaderBackgroundColor
         navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .Cancel, target: self, action: Selector("dismiss"))
         view.addSubview(pager)
@@ -132,6 +136,26 @@ extension PasscodeConfirmViewController {
     @objc private func dismiss() {
         self.dismissViewControllerAnimated(true, completion: nil)
     }
+
+    private func displayError(text: String) {
+        guard let keyboardSpace = keyboardIntersectionHeight else {
+            return
+        }
+
+        errorToast?.removeFromSuperview()
+        errorToast = {
+            let toast = ErrorToast()
+            toast.textLabel.text = text
+            view.addSubview(toast)
+            toast.snp_makeConstraints { make in
+                make.centerX.equalTo(self.view)
+                make.bottom.equalTo(self.view).offset(-(keyboardSpace + errorPadding))
+                make.left.greaterThanOrEqualTo(self.view).offset(errorPadding)
+                make.right.lessThanOrEqualTo(self.view).offset(-errorPadding)
+            }
+            return toast
+        }()
+    }
 }
 
 extension PasscodeConfirmViewController: PasscodeInputViewDelegate {
@@ -140,7 +164,7 @@ extension PasscodeConfirmViewController: PasscodeInputViewDelegate {
             // Constraint: When removing or changing a passcode, we need to make sure that the first passcode they've
             // entered matches the one stored in the keychain
             if (confirmAction == .Removed || confirmAction == .Changed) && code != authenticationInfo?.passcode {
-                // TODO: Show error for incorrect passcode
+                displayError(AuthenticationStrings.wrongPasscodeError)
                 inputView.resetCode()
                 inputView.becomeFirstResponder()
                 return
@@ -154,14 +178,22 @@ extension PasscodeConfirmViewController: PasscodeInputViewDelegate {
         } else if currentPaneIndex == 1 {
             // Constraint: When changing passcodes, the new passcode cannot match their old passcode.
             if confirmAction == .Changed && confirmCode == code {
-                // TODO: Show error telling the user that they need to enter a different passcode
+                let useNewPasscodeError
+                    = NSLocalizedString("New passcode must be different than existing code.",
+                        tableName: "AuthenticationManager",
+                        comment: "Error message displayed when user tries to enter the same passcode as their existing code when changing it.")
+                displayError(useNewPasscodeError)
                 resetConfirmation()
                 return
             }
 
             // Constraint: When removing/creating passcodes, the first and confirmation codes must match.
             if (confirmAction == .Created || confirmAction == .Removed) && confirmCode != code {
-                // TODO: Show error telling the user that the passcodes must match
+                let mismatchPasscodeError
+                    = NSLocalizedString("Passcodes didn't match. Try again.",
+                        tableName: "AuthenticationManager",
+                        comment: "Error message displayed to user when their confirming passcode doesn't match the first code.")
+                displayError(mismatchPasscodeError)
                 resetConfirmation()
                 return
             }
@@ -197,4 +229,13 @@ extension PasscodeConfirmViewController: PasscodeInputViewDelegate {
         KeychainWrapper.setAuthenticationInfo(authenticationInfo)
         notificationCenter.postNotificationName(notificationName, object: nil)
     }
+}
+
+extension PasscodeConfirmViewController: KeyboardHelperDelegate {
+    func keyboardHelper(keyboardHelper: KeyboardHelper, keyboardDidShowWithState state: KeyboardState) {
+        keyboardIntersectionHeight = state.intersectionHeightForView(self.view)
+    }
+
+    func keyboardHelper(keyboardHelper: KeyboardHelper, keyboardWillHideWithState state: KeyboardState) {}
+    func keyboardHelper(keyboardHelper: KeyboardHelper, keyboardWillShowWithState state: KeyboardState) {}
 }
