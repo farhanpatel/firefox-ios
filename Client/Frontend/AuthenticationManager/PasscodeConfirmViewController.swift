@@ -35,7 +35,6 @@ class PasscodeConfirmViewController: UIViewController {
 
     private let confirmAction: PasscodeConfirmAction
     private var authenticationInfo: AuthenticationKeychainInfo?
-    private var keyboardIntersectionHeight: CGFloat?
     private var errorToast: ErrorToast?
     private let errorPadding: CGFloat = 10
 
@@ -78,7 +77,6 @@ class PasscodeConfirmViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        KeyboardHelper.defaultHelper.addDelegate(self)
         view.backgroundColor = UIConstants.TableViewHeaderBackgroundColor
         navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .Cancel, target: self, action: Selector("dismiss"))
         view.addSubview(pager)
@@ -101,7 +99,14 @@ class PasscodeConfirmViewController: UIViewController {
     override func viewWillAppear(animated: Bool) {
         super.viewWillAppear(animated)
         panes.first?.codeInputView.delegate = self
-        panes.first?.codeInputView.becomeFirstResponder()
+
+        // Don't show the keyboard or allow typing if we're locked out. Also display the error.
+        if authenticationInfo?.isLocked() ?? false {
+            displayError(AuthenticationStrings.maximumAttemptsReached)
+            panes.first?.codeInputView.userInteractionEnabled = false
+        } else {
+            panes.first?.codeInputView.becomeFirstResponder()
+        }
     }
 
     override func viewWillDisappear(animated: Bool) {
@@ -138,18 +143,13 @@ extension PasscodeConfirmViewController {
     }
 
     private func displayError(text: String) {
-        guard let keyboardSpace = keyboardIntersectionHeight else {
-            return
-        }
-
         errorToast?.removeFromSuperview()
         errorToast = {
             let toast = ErrorToast()
             toast.textLabel.text = text
             view.addSubview(toast)
             toast.snp_makeConstraints { make in
-                make.centerX.equalTo(self.view)
-                make.bottom.equalTo(self.view).offset(-(keyboardSpace + errorPadding))
+                make.center.equalTo(self.view)
                 make.left.greaterThanOrEqualTo(self.view).offset(errorPadding)
                 make.right.lessThanOrEqualTo(self.view).offset(-errorPadding)
             }
@@ -164,13 +164,27 @@ extension PasscodeConfirmViewController: PasscodeInputViewDelegate {
             // Constraint: When removing or changing a passcode, we need to make sure that the first passcode they've
             // entered matches the one stored in the keychain
             if (confirmAction == .Removed || confirmAction == .Changed) && code != authenticationInfo?.passcode {
-                displayError(AuthenticationStrings.wrongPasscodeError)
+                authenticationInfo?.recordFailedAttempt()
+                let numberOfAttempts = authenticationInfo?.failedAttempts ?? 0
+                if numberOfAttempts == AllowedPasscodeFailedAttempts {
+                    authenticationInfo?.lockOutUser()
+                    displayError(AuthenticationStrings.maximumAttemptsReached)
+                    inputView.userInteractionEnabled = false
+                    resignFirstResponder()
+                } else {
+                    displayError(String(format: AuthenticationStrings.incorrectAttemptsRemaining, (AllowedPasscodeFailedAttempts - numberOfAttempts)))
+                }
+
                 inputView.resetCode()
-                inputView.becomeFirstResponder()
+
+                // Store mutations on authentication info object
+                KeychainWrapper.setAuthenticationInfo(authenticationInfo)
                 return
             }
 
             confirmCode = code
+            // Clear out any previous errors if we are allowed to proceed
+            errorToast?.removeFromSuperview()
             scrollToNextPane()
             let nextPane = panes[currentPaneIndex]
             nextPane.codeInputView.becomeFirstResponder()
@@ -229,13 +243,4 @@ extension PasscodeConfirmViewController: PasscodeInputViewDelegate {
         KeychainWrapper.setAuthenticationInfo(authenticationInfo)
         notificationCenter.postNotificationName(notificationName, object: nil)
     }
-}
-
-extension PasscodeConfirmViewController: KeyboardHelperDelegate {
-    func keyboardHelper(keyboardHelper: KeyboardHelper, keyboardDidShowWithState state: KeyboardState) {
-        keyboardIntersectionHeight = state.intersectionHeightForView(self.view)
-    }
-
-    func keyboardHelper(keyboardHelper: KeyboardHelper, keyboardWillHideWithState state: KeyboardState) {}
-    func keyboardHelper(keyboardHelper: KeyboardHelper, keyboardWillShowWithState state: KeyboardState) {}
 }

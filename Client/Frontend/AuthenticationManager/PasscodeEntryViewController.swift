@@ -17,7 +17,6 @@ class PasscodeEntryViewController: UIViewController {
     weak var delegate: PasscodeEntryDelegate?
     private let passcodePane = PasscodePane()
     private var authenticationInfo: AuthenticationKeychainInfo?
-    private var keyboardIntersectionHeight: CGFloat?
     private var errorToast: ErrorToast?
     private let errorPadding: CGFloat = 10
 
@@ -41,13 +40,19 @@ class PasscodeEntryViewController: UIViewController {
             make.bottom.left.right.equalTo(self.view)
             make.top.equalTo(self.snp_topLayoutGuideBottom)
         }
-        KeyboardHelper.defaultHelper.addDelegate(self)
     }
 
     override func viewWillAppear(animated: Bool) {
         super.viewWillAppear(animated)
         passcodePane.codeInputView.delegate = self
-        passcodePane.codeInputView.becomeFirstResponder()
+
+        // Don't show the keyboard or allow typing if we're locked out. Also display the error.
+        if authenticationInfo?.isLocked() ?? false {
+            displayError(AuthenticationStrings.maximumAttemptsReached)
+            passcodePane.codeInputView.userInteractionEnabled = false
+        } else {
+            passcodePane.codeInputView.becomeFirstResponder()
+        }
     }
 
     override func viewWillDisappear(animated: Bool) {
@@ -65,41 +70,39 @@ extension PasscodeEntryViewController {
 extension PasscodeEntryViewController: PasscodeInputViewDelegate {
     func passcodeInputView(inputView: PasscodeInputView, didFinishEnteringCode code: String) {
         if let passcode = authenticationInfo?.passcode where passcode == code {
-            authenticationInfo?.recordValidationTime()
+            authenticationInfo?.recordValidation()
             KeychainWrapper.setAuthenticationInfo(authenticationInfo)
             delegate?.passcodeValidationDidSucceed()
         } else {
-            displayError("Incorrect passcode. Try again.")
+            authenticationInfo?.recordFailedAttempt()
+            let numberOfAttempts = authenticationInfo?.failedAttempts ?? 0
+            if numberOfAttempts == AllowedPasscodeFailedAttempts {
+                authenticationInfo?.lockOutUser()
+                displayError(AuthenticationStrings.maximumAttemptsReached)
+                passcodePane.codeInputView.userInteractionEnabled = false
+                resignFirstResponder()
+            } else {
+                displayError(String(format: AuthenticationStrings.incorrectAttemptsRemaining, (AllowedPasscodeFailedAttempts - numberOfAttempts)))
+            }
             passcodePane.codeInputView.resetCode()
+
+            // Store mutations on authentication info object
+            KeychainWrapper.setAuthenticationInfo(authenticationInfo)
         }
     }
 
     private func displayError(text: String) {
-        guard let keyboardSpace = keyboardIntersectionHeight else {
-            return
-        }
-
         errorToast?.removeFromSuperview()
         errorToast = {
             let toast = ErrorToast()
             toast.textLabel.text = text
             view.addSubview(toast)
             toast.snp_makeConstraints { make in
-                make.centerX.equalTo(self.view)
-                make.bottom.equalTo(self.view).offset(-(keyboardSpace + errorPadding))
+                make.center.equalTo(self.view)
                 make.left.greaterThanOrEqualTo(self.view).offset(errorPadding)
                 make.right.lessThanOrEqualTo(self.view).offset(-errorPadding)
             }
             return toast
         }()
     }
-}
-
-extension PasscodeEntryViewController: KeyboardHelperDelegate {
-    func keyboardHelper(keyboardHelper: KeyboardHelper, keyboardDidShowWithState state: KeyboardState) {
-        keyboardIntersectionHeight = state.intersectionHeightForView(self.view)
-    }
-
-    func keyboardHelper(keyboardHelper: KeyboardHelper, keyboardWillHideWithState state: KeyboardState) {}
-    func keyboardHelper(keyboardHelper: KeyboardHelper, keyboardWillShowWithState state: KeyboardState) {}
 }
