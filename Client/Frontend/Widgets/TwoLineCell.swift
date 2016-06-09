@@ -205,7 +205,7 @@ class TwoLineHeaderFooterView: UITableViewHeaderFooterView {
 }
 
 private class TwoLineCellHelper {
-    var container: UIView!
+    weak var container: UIView?
     var textLabel: UILabel!
     var detailTextLabel: UILabel!
     var imageView: UIImageView!
@@ -222,7 +222,7 @@ private class TwoLineCellHelper {
         if let headerView = self.container as? UITableViewHeaderFooterView {
             headerView.contentView.backgroundColor = UIColor.clearColor()
         } else {
-            self.container.backgroundColor = UIColor.clearColor()
+            self.container?.backgroundColor = UIColor.clearColor()
         }
 
         textLabel.textColor = TwoLineCellUX.TextColor
@@ -238,7 +238,11 @@ private class TwoLineCellHelper {
     }
 
     func layoutSubviews() {
-        let height = container.frame.height
+        guard let viewContainer = container else {
+            return
+        }
+
+        let height = viewContainer.frame.height
         let textLeft = hasBorderView ? TwoLineCellUX.BorderFrameSize + 2 * TwoLineCellUX.BorderViewMargin : TwoLineCellUX.ImageSize + 2 * TwoLineCellUX.BorderViewMargin
         let textLabelHeight = textLabel.intrinsicContentSize().height
         let detailTextLabelHeight = detailTextLabel.intrinsicContentSize().height
@@ -251,9 +255,9 @@ private class TwoLineCellHelper {
 
         imageView.frame = CGRectMake(TwoLineCellUX.BorderViewMargin, (height - TwoLineCellUX.ImageSize) / 2, TwoLineCellUX.ImageSize, TwoLineCellUX.ImageSize)
         textLabel.frame = CGRectMake(textLeft, (height - contentHeight) / 2,
-            container.frame.width - textLeft - TwoLineCellUX.BorderViewMargin - textRightInset, textLabelHeight)
+            viewContainer.frame.width - textLeft - TwoLineCellUX.BorderViewMargin - textRightInset, textLabelHeight)
         detailTextLabel.frame = CGRectMake(textLeft, textLabel.frame.maxY + TwoLineCellUX.DetailTextTopMargin,
-            container.frame.width - textLeft - TwoLineCellUX.BorderViewMargin - textRightInset, detailTextLabelHeight)
+            viewContainer.frame.width - textLeft - TwoLineCellUX.BorderViewMargin - textRightInset, detailTextLabelHeight)
     }
 
     func setLines(text: String?, detailText: String?) {
@@ -267,6 +271,10 @@ private class TwoLineCellHelper {
     }
 
     func mergeAccessibilityLabels(labels: [AnyObject?]?) {
+        guard let viewContainer = container else {
+            return
+        }
+
         let labels = labels ?? [textLabel, imageView, detailTextLabel]
 
         let label = labels.map({ (label: AnyObject?) -> NSAttributedString? in
@@ -292,7 +300,7 @@ private class TwoLineCellHelper {
             return $0
         })
 
-        container.isAccessibilityElement = true
-        container.setValue(NSAttributedString(attributedString: label), forKey: "accessibilityLabel")
+        viewContainer.isAccessibilityElement = true
+        viewContainer.setValue(NSAttributedString(attributedString: label), forKey: "accessibilityLabel")
     }
 }
