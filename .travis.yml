@@ -14,7 +14,7 @@ before_install:
 
 
 # Lets clean and build.
-script: xcodebuild CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= PROVISIONING_PROFILE= ONLY_ACTIVE_ARCH=NO VALID_ARCHS="i386 x86_64" -destination 'platform=iOS Simulator,name=iPhone 4s,OS=9.3' -sdk iphonesimulator -project 'Client.xcodeproj' -scheme "FennecCI" clean build
+script: travis_wait 60 xcodebuild CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= PROVISIONING_PROFILE= ONLY_ACTIVE_ARCH=NO VALID_ARCHS="i386 x86_64" -destination 'platform=iOS Simulator,name=iPhone 4s,OS=9.3' -sdk iphonesimulator -project 'Client.xcodeproj' -scheme "FennecCI" clean build | xcpretty
 
 # Lets keep test seperate
 
