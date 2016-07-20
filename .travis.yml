@@ -1,6 +1,6 @@
 language: objective-c
 
-osx_image: xcode7.2
+osx_image: xcode7.3
 
 cache:
   directories:
@@ -12,7 +12,14 @@ before_install:
   - brew upgrade carthage || true
   - carthage bootstrap --platform ios --no-use-binaries
 
-script: xctool build -scheme Fennec -sdk iphonesimulator9.2 -arch "i386" ONLY_ACTIVE_ARCH=NO VALID_ARCHS="i386 x86_64"
+
+# Lets clean and build.
+script: xcodebuild CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= PROVISIONING_PROFILE= ONLY_ACTIVE_ARCH=NO VALID_ARCHS="i386 x86_64" -destination 'platform=iOS Simulator,name=iPhone 4s,OS=9.3' -sdk iphonesimulator -project 'Client.xcodeproj' -scheme "FennecCI" clean build
+
+# Lets keep test seperate
+
+# xcodebuild CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= PROVISIONING_PROFILE= ONLY_ACTIVE_ARCH=NO VALID_ARCHS="i386 x86_64" -destination 'platform=iOS Simulator,name=iPhone 4s,OS=9.3' -sdk iphonesimulator -project 'Client.xcodeproj' -scheme "FennecCI" clean build 
+#     - xcpretty --color --report junit --output $CIRCLE_TEST_REPORTS/xcode/results.xml < $CIRCLE_ARTIFACTS/xcode_raw.log || exit 0
 
 #osx_image: beta-xcode6.3
 #language: objective-c
