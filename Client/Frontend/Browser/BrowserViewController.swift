@@ -1042,6 +1042,7 @@ class BrowserViewController: UIViewController {
         } else {
             request = nil
         }
+        
         if #available(iOS 9, *) {
             switchToPrivacyMode(isPrivate: isPrivate)
             tabManager.addTabAndSelect(request, isPrivate: isPrivate)
@@ -1387,6 +1388,7 @@ extension BrowserViewController: MenuActionDelegate {
     private func openHomePanel(panel: HomePanelType, forAppState appState: AppState) {
         switch appState.ui {
         case .Tab(_):
+
             self.openURLInNewTab(panel.localhostURL, isPrivate: appState.ui.isPrivate())
         case .HomePanels(_):
             self.homePanelController?.selectedPanel = panel
@@ -2274,12 +2276,12 @@ extension BrowserViewController: WKNavigationDelegate {
         // every time. There is no way around this prompt. (TODO Confirm this is true by adding them to the Info.plist)
 
         let openedURL = UIApplication.sharedApplication().openURL(url)
-        if !openedURL {
-            let alert = UIAlertController(title: Strings.UnableToOpenURLErrorTitle, message: Strings.UnableToOpenURLError, preferredStyle: .Alert)
-            alert.addAction(UIAlertAction(title: UIConstants.OKString, style: UIAlertActionStyle.Default, handler: nil))
-            self.presentViewController(alert, animated: true, completion: nil)
-        }
-        decisionHandler(WKNavigationActionPolicy.Cancel)
+//        if !openedURL {
+//            let alert = UIAlertController(title: Strings.UnableToOpenURLErrorTitle, message: Strings.UnableToOpenURLError, preferredStyle: .Alert)
+//            alert.addAction(UIAlertAction(title: UIConstants.OKString, style: UIAlertActionStyle.Default, handler: nil))
+//            self.presentViewController(alert, animated: true, completion: nil)
+//        }
+        decisionHandler(WKNavigationActionPolicy.Allow)
     }
 
     func webView(webView: WKWebView, didReceiveAuthenticationChallenge challenge: NSURLAuthenticationChallenge, completionHandler: (NSURLSessionAuthChallengeDisposition, NSURLCredential?) -> Void) {
@@ -2566,7 +2568,7 @@ extension BrowserViewController: WKUIDelegate {
         }
 
         openInHelper.open()
-        decisionHandler(WKNavigationResponsePolicy.Cancel)
+        decisionHandler(WKNavigationResponsePolicy.Allow)
     }
     
     @available(iOS 9, *)
