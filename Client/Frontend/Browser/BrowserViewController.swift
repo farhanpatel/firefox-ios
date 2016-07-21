@@ -2212,7 +2212,7 @@ extension BrowserViewController: WKNavigationDelegate {
 
     func webView(webView: WKWebView, decidePolicyForNavigationAction navigationAction: WKNavigationAction, decisionHandler: (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.URL else {
-            decisionHandler(WKNavigationActionPolicy.Cancel)
+            decisionHandler(WKNavigationActionPolicy.Allow)
             return
         }
 
@@ -2224,7 +2224,7 @@ extension BrowserViewController: WKNavigationDelegate {
 
         if !navigationAction.isAllowed && navigationAction.navigationType != .BackForward {
             log.warning("Denying unprivileged request: \(navigationAction.request)")
-            decisionHandler(WKNavigationActionPolicy.Cancel)
+            decisionHandler(WKNavigationActionPolicy.Allow)
             return
         }
 
@@ -2344,6 +2344,33 @@ extension BrowserViewController: WKNavigationDelegate {
             // the currently loaded page can be turned into reading mode or if the page already is in reading mode. We
             // ignore the result because we are being called back asynchronous when the readermode status changes.
             webView.evaluateJavaScript("_firefox_ReaderMode.checkReadability()", completionHandler: nil)
+
+            //Here we test the iOS->AS bridge
+
+            webView.evaluateJavaScript("window.firefoxFakeTopSites()") { (result, _) in
+                if  let res = result as? String {
+                    webView.evaluateJavaScript("window.firefoxTopSites(\(res))", completionHandler:nil)
+                }
+            }
+
+            webView.evaluateJavaScript("window.firefoxFakeBookmarks()") { (result, _) in
+                if  let res = result as? String {
+                    webView.evaluateJavaScript("window.firefoxBookmarks(\(res))", completionHandler:nil)
+                }
+            }
+
+            webView.evaluateJavaScript("window.firefoxFakeRecent()") { (result, _) in
+                if  let res = result as? String {
+                    webView.evaluateJavaScript("window.firefoxRecent(\(res))", completionHandler:nil)
+                }
+            }
+
+            webView.evaluateJavaScript("window.firefoxFakeHighlights()") { (result, _) in
+                if  let res = result as? String {
+                    webView.evaluateJavaScript("window.firefoxHighlights(\(res))", completionHandler:nil)
+                }
+            }
+
         }
 
         if tab === tabManager.selectedTab {
