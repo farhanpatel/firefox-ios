@@ -54,7 +54,8 @@ enum HomePanelType: Int {
     case ReadingList = 3
 
     var localhostURL: NSURL {
-        return NSURL(string:"#panel=\(self.rawValue)", relativeToURL: UIConstants.AboutHomePage)!
+        let path: String = NSBundle.mainBundle().pathForResource("activity-streams.html", ofType: "", inDirectory: "AS")!
+        return NSURL(fileURLWithPath: path)
     }
 }
 

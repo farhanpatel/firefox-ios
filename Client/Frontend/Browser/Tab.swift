@@ -327,19 +327,7 @@ class Tab: NSObject {
     func loadRequest(request: NSURLRequest) -> WKNavigation? {
         if let webView = webView {
             lastRequest = request
-            print(request.URLString)
-            if ((request.URLString.contains("localhost"))) {
-                let path: String = NSBundle.mainBundle().pathForResource("activity-streams.html", ofType: "", inDirectory: "AS")!
-                print(path)
-                if #available(iOS 9.0, *) {
-                    webView.loadFileURL(NSURL(fileURLWithPath:path) , allowingReadAccessToURL: NSURL(fileURLWithPath:path).URLByDeletingLastPathComponent!)
-                } else {
-                    // Fallback on earlier versions
-                }
-            }
-            else {
-                webView.loadRequest(request)
-            }
+            webView.loadRequest(request)
         }
         return nil
     }

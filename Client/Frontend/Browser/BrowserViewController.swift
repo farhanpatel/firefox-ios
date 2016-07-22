@@ -77,6 +77,15 @@ class BrowserViewController: UIViewController {
     private let profile: Profile
     let tabManager: TabManager
 
+    var isAS: Bool {
+        if let webView = tabManager.selectedTab?.webView {
+            return (webView.URL?.absoluteString.contains("activity-streams"))!
+        }
+        else {
+            return false
+        }
+    }
+
     // These views wrap the urlbar and toolbar to provide background effects on them
     var header: BlurWrapper!
     var headerBackdrop: UIView!
@@ -802,6 +811,16 @@ class BrowserViewController: UIViewController {
         }
     }
 
+    /*
+     let path: String = NSBundle.mainBundle().pathForResource("activity-streams.html", ofType: "", inDirectory: "AS")!
+     print(path)
+     if #available(iOS 9.0, *) {
+     webView.loadFileURL(NSURL(fileURLWithPath:path) , allowingReadAccessToURL: NSURL(fileURLWithPath:path).URLByDeletingLastPathComponent!)
+     } else {
+     // Fallback on earlier versions
+     }
+ */
+
     private func finishEditingAndSubmit(url: NSURL, visitType: VisitType) {
         urlBar.currentURL = url
         urlBar.leaveOverlayMode()
@@ -1188,24 +1207,24 @@ class BrowserViewController: UIViewController {
     }
 
     func reloadTab(){
-        if(homePanelController == nil){
+        if homePanelController == nil && !isAS {
             tabManager.selectedTab?.reload()
         }
     }
 
     func goBack(){
-        if(tabManager.selectedTab?.canGoBack == true && homePanelController == nil){
+        if(tabManager.selectedTab?.canGoBack == true && homePanelController == nil && !isAS){
             tabManager.selectedTab?.goBack()
         }
     }
     func goForward(){
-        if(tabManager.selectedTab?.canGoForward == true && homePanelController == nil){
+        if(tabManager.selectedTab?.canGoForward == true && homePanelController == nil && !isAS){
             tabManager.selectedTab?.goForward()
         }
     }
 
     func findOnPage(){
-        if(homePanelController == nil){
+        if(homePanelController == nil && !isAS){
             tab( (tabManager.selectedTab)!, didSelectFindInPageForSelection: "")
         }
     }
