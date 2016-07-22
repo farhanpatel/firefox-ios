@@ -8,6 +8,7 @@ import XCGLogger
 import Storage
 import WebImage
 import Deferred
+import WebKit
 
 private let log = Logger.browserLogger
 
@@ -36,6 +37,8 @@ class TopSitesPanel: UIViewController {
         return TopSitesDataSource(profile: self.profile)
     }()
     private lazy var layout: TopSitesLayout = { return TopSitesLayout() }()
+
+    let webView: WKWebView = WKWebView()
 
     private lazy var maxFrecencyLimit: Int = {
         return max(
@@ -88,22 +91,34 @@ class TopSitesPanel: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        let collection = TopSitesCollectionView(frame: self.view.frame, collectionViewLayout: layout)
-        collection.backgroundColor = UIConstants.PanelBackgroundColor
-        collection.delegate = self
-        collection.dataSource = dataSource
-        collection.registerClass(ThumbnailCell.self, forCellWithReuseIdentifier: ThumbnailIdentifier)
-        collection.keyboardDismissMode = .OnDrag
-        collection.accessibilityIdentifier = "Top Sites View"
-        view.addSubview(collection)
-        collection.snp_makeConstraints { make in
+
+
+        let path: String = NSBundle.mainBundle().pathForResource("activity-streams.html", ofType: "", inDirectory: "AS")!
+        let req = NSURLRequest(URL: NSURL(fileURLWithPath: path))
+        self.webView.loadRequest(req)
+
+        self.view.addSubview(webView)
+        self.webView.snp_makeConstraints { make in
             make.edges.equalTo(self.view)
         }
-        self.collection = collection
 
-        self.dataSource.collectionView = self.collection
-        self.profile.history.setTopSitesCacheSize(Int32(maxFrecencyLimit))
-        self.refreshTopSites(maxFrecencyLimit)
+
+//        let collection = TopSitesCollectionView(frame: self.view.frame, collectionViewLayout: layout)
+//        collection.backgroundColor = UIConstants.PanelBackgroundColor
+//        collection.delegate = self
+//        collection.dataSource = dataSource
+//        collection.registerClass(ThumbnailCell.self, forCellWithReuseIdentifier: ThumbnailIdentifier)
+//        collection.keyboardDismissMode = .OnDrag
+//        collection.accessibilityIdentifier = "Top Sites View"
+//        view.addSubview(collection)
+//        collection.snp_makeConstraints { make in
+//            make.edges.equalTo(self.view)
+//        }
+//        self.collection = collection
+//
+//        self.dataSource.collectionView = self.collection
+//        self.profile.history.setTopSitesCacheSize(Int32(maxFrecencyLimit))
+ //       self.refreshTopSites(maxFrecencyLimit)
     }
 
     override func viewDidLayoutSubviews() {
