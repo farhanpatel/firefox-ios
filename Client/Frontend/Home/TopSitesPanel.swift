@@ -29,7 +29,7 @@ struct TopSitesPanelUX {
     private static let WelcomeScreenItemWidth = 170
 }
 
-class TopSitesPanel: UIViewController {
+class TopSitesPanel: UIViewController, WKScriptMessageHandler {
     weak var homePanelDelegate: HomePanelDelegate?
     private lazy var emptyStateOverlayView: UIView = self.createEmptyStateOverlayView()
     private var collection: TopSitesCollectionView? = nil
@@ -38,7 +38,7 @@ class TopSitesPanel: UIViewController {
     }()
     private lazy var layout: TopSitesLayout = { return TopSitesLayout() }()
 
-    let webView: WKWebView = WKWebView()
+    var webView: WKWebView!
 
     private lazy var maxFrecencyLimit: Int = {
         return max(
@@ -79,23 +79,43 @@ class TopSitesPanel: UIViewController {
     init(profile: Profile) {
         self.profile = profile
         super.init(nibName: nil, bundle: nil)
+
+        let config = WKWebViewConfiguration()
+        let userController  = WKUserContentController()
+        userController.addScriptMessageHandler(self, name: "topsitesHandler")
+        config.userContentController = userController
+        webView = WKWebView(frame: CGRectZero, configuration: config)
         NSNotificationCenter.defaultCenter().addObserver(self, selector: #selector(TopSitesPanel.notificationReceived(_:)), name: NotificationFirefoxAccountChanged, object: nil)
         NSNotificationCenter.defaultCenter().addObserver(self, selector: #selector(TopSitesPanel.notificationReceived(_:)), name: NotificationProfileDidFinishSyncing, object: nil)
         NSNotificationCenter.defaultCenter().addObserver(self, selector: #selector(TopSitesPanel.notificationReceived(_:)), name: NotificationPrivateDataClearedHistory, object: nil)
         NSNotificationCenter.defaultCenter().addObserver(self, selector: #selector(TopSitesPanel.notificationReceived(_:)), name: NotificationDynamicFontChanged, object: nil)
+
+        //WKWebViewConfiguration *configuration = [[WKWebViewConfiguration alloc]init];
+
+
     }
 
     required init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
+    func userContentController(userContentController: WKUserContentController, didReceiveScriptMessage message: WKScriptMessage) {
+        if let url = message.body as? String {
+            let visitType = VisitType.Bookmark
+            homePanelDelegate?.homePanel(self, didSelectURL: NSURL(string: url)!, visitType: visitType)
+        }
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
 
 
+
+
         let path: String = NSBundle.mainBundle().pathForResource("activity-streams.html", ofType: "", inDirectory: "AS")!
         let req = NSURLRequest(URL: NSURL(fileURLWithPath: path))
-        self.webView.loadRequest(req)
+        let devReq = NSURLRequest(URL: NSURL(string: "http://localhost:1963/activity-streams.html")!)
+        self.webView.loadRequest(devReq)
 
         self.view.addSubview(webView)
         self.webView.snp_makeConstraints { make in

@@ -54,8 +54,9 @@ enum HomePanelType: Int {
     case ReadingList = 3
 
     var localhostURL: NSURL {
-        let path: String = NSBundle.mainBundle().pathForResource("activity-streams.html", ofType: "", inDirectory: "AS")!
-        return NSURL(fileURLWithPath: path)
+        return NSURL(string:"#panel=\(self.rawValue)", relativeToURL: UIConstants.AboutHomePage)!
+//        let path: String = NSBundle.mainBundle().pathForResource("activity-streams.html", ofType: "", inDirectory: "AS")!
+//        return NSURL(fileURLWithPath: path)
     }
 }
 
@@ -63,6 +64,7 @@ class HomePanelViewController: UIViewController, UITextFieldDelegate, HomePanelD
     var profile: Profile!
     var notificationToken: NSObjectProtocol!
     var panels: [HomePanelDescriptor]!
+    var cachedPanels: [Int:UIViewController?] = [:]
     var url: NSURL?
     weak var delegate: HomePanelViewControllerDelegate?
     weak var appStateDelegate: AppStateDelegate?
@@ -170,7 +172,10 @@ class HomePanelViewController: UIViewController, UITextFieldDelegate, HomePanelD
                 }
 
                 if index < panels.count {
-                    let panel = self.panels[index].makeViewController(profile: profile)
+                    let panel = self.cachedPanels[index] != nil ? self.cachedPanels[index]!! : self.panels[index].makeViewController(profile: profile)
+                    if self.cachedPanels[index] != nil {
+                        self.cachedPanels[index] = panel
+                    }
                     let accessibilityLabel = self.panels[index].accessibilityLabel
                     if let panelController = panel as? UINavigationController,
                         let rootPanel = panelController.viewControllers.first {
