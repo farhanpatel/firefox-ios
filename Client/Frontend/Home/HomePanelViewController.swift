@@ -64,7 +64,7 @@ class HomePanelViewController: UIViewController, UITextFieldDelegate, HomePanelD
     var profile: Profile!
     var notificationToken: NSObjectProtocol!
     var panels: [HomePanelDescriptor]!
-    var cachedPanels: [Int:UIViewController?] = [:]
+    var topSitesPanel: UIViewController?
     var url: NSURL?
     weak var delegate: HomePanelViewControllerDelegate?
     weak var appStateDelegate: AppStateDelegate?
@@ -172,10 +172,13 @@ class HomePanelViewController: UIViewController, UITextFieldDelegate, HomePanelD
                 }
 
                 if index < panels.count {
-                    let panel = self.cachedPanels[index] != nil ? self.cachedPanels[index]!! : self.panels[index].makeViewController(profile: profile)
-                    if self.cachedPanels[index] != nil {
-                        self.cachedPanels[index] = panel
+                    if index == 0 {
+                        if topSitesPanel == nil {
+                            topSitesPanel = self.panels[index].makeViewController(profile: profile)
+                        }
+
                     }
+                    let panel =  index == 0 ? topSitesPanel! : self.panels[index].makeViewController(profile: profile)
                     let accessibilityLabel = self.panels[index].accessibilityLabel
                     if let panelController = panel as? UINavigationController,
                         let rootPanel = panelController.viewControllers.first {
