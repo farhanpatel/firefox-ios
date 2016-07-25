@@ -115,7 +115,7 @@ class TopSitesPanel: UIViewController, WKScriptMessageHandler {
         let path: String = NSBundle.mainBundle().pathForResource("activity-streams.html", ofType: "", inDirectory: "AS")!
         let req = NSURLRequest(URL: NSURL(fileURLWithPath: path))
         let devReq = NSURLRequest(URL: NSURL(string: "http://localhost:1963/activity-streams.html")!)
-        self.webView.loadRequest(devReq)
+        self.webView.loadRequest(req)
 
         self.view.addSubview(webView)
         self.webView.snp_makeConstraints { make in
