@@ -9,6 +9,7 @@ import Storage
 import WebImage
 import Deferred
 import WebKit
+import Alamofire
 
 private let log = Logger.browserLogger
 
@@ -106,14 +107,56 @@ class TopSitesPanel: UIViewController, WKScriptMessageHandler {
         }
     }
 
+
+    func testRemoteLoading() {
+        Alamofire.request(.GET,"").responseData { (request, response, data) in
+            let fileManager = NSFileManager.defaultManager()
+            let directoryURL = fileManager.URLsForDirectory(.DocumentDirectory, inDomains: .UserDomainMask)[0]
+            let pathComponent = "AS/activity-streams.html"
+            
+
+        }
+//        Alamofire.download(.GET, "http://localhost:1963/activity-streams.html") { temporaryURL, response in
+//
+//            print("downloaded")
+//            print(directoryURL.URLByAppendingPathComponent(pathComponent))
+//
+//            return directoryURL.URLByAppendingPathComponent(pathComponent)
+//        }
+
+
+    }
+
+    func copyToDocs() {
+        let bundlePath = NSBundle.mainBundle().pathForResource("AS", ofType: "")
+        print(bundlePath, "\n") //prints the correct path
+        let destPath = NSSearchPathForDirectoriesInDomains(.DocumentDirectory, .UserDomainMask, true).first!
+        let fileManager = NSFileManager.defaultManager()
+        let fullDestPath = NSURL(fileURLWithPath: destPath).URLByAppendingPathComponent("AS")
+        let fullDestPathString = fullDestPath.path
+        print(fullDestPathString)
+        print(fileManager.fileExistsAtPath(bundlePath!)) // prints true
+
+        do{
+            try fileManager.copyItemAtPath(bundlePath!, toPath: fullDestPathString!)
+        }catch{
+            print("\n")
+            print(error)
+        }
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
+        testRemoteLoading()
 
+//        copyToDocs
+        let fileManager = NSFileManager.defaultManager()
+        let directoryURL = fileManager.URLsForDirectory(.DocumentDirectory, inDomains: .UserDomainMask)[0]
+        let pathComponent = "AS/activity-streams.html"
 
-
-
-        let path: String = NSBundle.mainBundle().pathForResource("activity-streams.html", ofType: "", inDirectory: "AS")!
-        let req = NSURLRequest(URL: NSURL(fileURLWithPath: path))
+        let path = directoryURL.URLByAppendingPathComponent(pathComponent)
+        print(path)
+        let req = NSURLRequest(URL: path)
         let devReq = NSURLRequest(URL: NSURL(string: "http://localhost:1963/activity-streams.html")!)
         self.webView.loadRequest(req)
 
