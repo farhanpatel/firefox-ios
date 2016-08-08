@@ -1347,35 +1347,8 @@ class TestSQLiteHistoryTransactionUpdate: XCTestCase {
 
 
 class TestSQLiteHistoryFrecencyPerf: XCTestCase {
-    let files = MockFiles()
-
-    private func deleteDatabases() {
-        for v in ["6", "7", "8", "10", "6-data"] {
-            do {
-                try files.remove("browser-v\(v).db")
-            } catch {}
-        }
-        do {
-            try files.remove("browser.db")
-            try files.remove("historysynced.db")
-        } catch {}
-    }
-
-    override func tearDown() {
-        super.tearDown()
-        self.deleteDatabases()
-    }
-
-    override func setUp() {
-        super.setUp()
-
-        // Just in case tearDown didn't run or succeed last time!
-        self.deleteDatabases()
-    }
-
-
-
     func testFrecencyPerf() {
+        let files = MockFiles()
         let db = BrowserDB(filename: "browser.db", files: files)
         let prefs = MockProfilePrefs()
         let history = SQLiteHistory(db: db, prefs: prefs)!
@@ -1384,14 +1357,13 @@ class TestSQLiteHistoryFrecencyPerf: XCTestCase {
 
         history.clearHistory().value
         populateHistoryForFrecencyCalculations(history, siteCount: count)
-        print("starting")
-        self.measureMetrics([XCTPerformanceMetric_WallClockTime], automaticallyStartMeasuring: true) {
+
+//        self.measureMetrics([XCTPerformanceMetric_WallClockTime], automaticallyStartMeasuring: true) {
             for _ in 0...5 {
                 history.getSitesByFrecencyWithHistoryLimit(10, includeIcon: false).value
             }
-            print("donee")
-            self.stopMeasuring()
-        }
+//            self.stopMeasuring()
+//        }
     }
 }
 
@@ -1408,10 +1380,10 @@ class TestSQLiteHistoryTopSitesCachePref: XCTestCase {
         populateHistoryForFrecencyCalculations(history, siteCount: count)
 
         history.setTopSitesNeedsInvalidation()
-        self.measureMetrics([XCTPerformanceMetric_WallClockTime], automaticallyStartMeasuring: true) {
+//        self.measureMetrics([XCTPerformanceMetric_WallClockTime], automaticallyStartMeasuring: true) {
             history.updateTopSitesCacheIfInvalidated().value
-            self.stopMeasuring()
-        }
+//            self.stopMeasuring()
+//        }
     }
 }
 
