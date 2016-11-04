@@ -51,6 +51,7 @@ class BrowserViewController: UIViewController {
     private let webViewContainerToolbar = UIView()
     private var findInPageBar: FindInPageBar?
     private let findInPageContainer = UIView()
+    private var lastMinZoomScale: CGFloat = 0
 
     private lazy var mailtoLinkHandler: MailtoLinkHandler = MailtoLinkHandler()
 
@@ -258,8 +259,12 @@ class BrowserViewController: UIViewController {
         }
     }
 
+
+
     override func willTransitionToTraitCollection(newCollection: UITraitCollection, withTransitionCoordinator coordinator: UIViewControllerTransitionCoordinator) {
         super.willTransitionToTraitCollection(newCollection, withTransitionCoordinator: coordinator)
+
+
 
         // During split screen launching on iPad, this callback gets fired before viewDidLoad gets a chance to
         // set things up. Make sure to only update the toolbar state if the view is ready for it.
@@ -273,13 +278,33 @@ class BrowserViewController: UIViewController {
         // performs a device rotation. Since scrolling calls
         // _updateVisibleContentRects (https://github.com/WebKit/webkit/blob/master/Source/WebKit2/UIProcess/API/Cocoa/WKWebView.mm#L1430)
         // this method nudges the web view's scroll view by a single pixel to force it to invalidate.
+        print("scalee \(self.tabManager.selectedTab?.webView?.scrollView.zoomScale)")
+        print("before scalee \(self.tabManager.selectedTab?.webView?.scrollView.minimumZoomScale)")
+        //before orientation record scale
+        //
+        print("scalee \(self.tabManager.selectedTab?.webView?.scrollView.maximumZoomScale)")
+        var newscale: CGFloat?
+        //
+
         if let scrollView = self.tabManager.selectedTab?.webView?.scrollView {
+            if (round(10000 * scrollView.zoomScale) / 10000)  == (round(10000 * scrollView.minimumZoomScale) / 10000) {
+                if self.lastMinZoomScale != 0 {
+                    newscale = self.lastMinZoomScale
+                } else {
+                     self.lastMinZoomScale = scrollView.zoomScale
+                }
+            }
+            self.lastMinZoomScale = scrollView.zoomScale == scrollView.minimumZoomScale ? scrollView.zoomScale : 0
+
             let contentOffset = scrollView.contentOffset
             coordinator.animateAlongsideTransition({ context in
                 scrollView.setContentOffset(CGPoint(x: contentOffset.x, y: contentOffset.y + 1), animated: true)
                 self.scrollController.showToolbars(animated: false)
             }, completion: { context in
                 scrollView.setContentOffset(CGPoint(x: contentOffset.x, y: contentOffset.y), animated: false)
+                if let scale = newscale {
+                    self.tabManager.selectedTab?.webView?.scrollView.zoomScale = scale
+                }
             })
         }
     }
