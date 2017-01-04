@@ -82,6 +82,9 @@ class TopTabsViewController: UIViewController {
     private var tabsToDisplay: [Tab] {
         return self.isPrivate ? tabManager.privateTabs : tabManager.normalTabs
     }
+
+    private var isUpdating = false
+    private var _oldTabs: [Tab] = []
     
     init(tabManager: TabManager) {
         self.tabManager = tabManager
@@ -103,8 +106,8 @@ class TopTabsViewController: UIViewController {
         collectionView.dataSource = self
         collectionView.delegate = tabLayoutDelegate
         collectionView.reloadData()
-        dispatch_async(dispatch_get_main_queue()) { 
-             self.scrollToCurrentTab(false, centerCell: true)
+        dispatch_async(dispatch_get_main_queue()) {
+           //  self.scrollToCurrentTab(false, centerCell: true)
         }
     }
     
@@ -174,24 +177,58 @@ class TopTabsViewController: UIViewController {
     }
     
     func newTabTapped() {
-        if let currentTab = tabManager.selectedTab, let index = tabsToDisplay.indexOf(currentTab),
-            let cell  = collectionView.cellForItemAtIndexPath(NSIndexPath(forItem: index, inSection: 0)) as? TopTabCell {
-            cell.selectedTab = false
-            if index > 0 {
-                cell.seperatorLine = true
+        if let currentTab = tabManager.selectedTab, let index = tabsToDisplay.indexOf(currentTab) {
+//            let cell  = collectionView.cellForItemAtIndexPath(NSIndexPath(forItem: index, inSection: 0)) as? TopTabCell {
+//            cell.selectedTab = false
+//            if index > 0 {
+//                cell.seperatorLine = true
+//            }
+        }
+
+        let currentTab = tabManager.selectedTab
+        let oldTabs = tabsToDisplay
+        delegate?.topTabsDidPressNewTab()
+        let newTabs = tabsToDisplay
+        let newSelectedTab = tabManager.selectedTab
+        self.updateTabsFrom(oldTabs, to: newTabs, reloadTabs: [currentTab!, newSelectedTab!])
+    }
+
+    func updateTabsFrom(oldTabs: [Tab], to newTabs: [Tab], reloadTabs: [Tab?]) {
+        var deletes: [NSIndexPath] = []
+        var inserts: [NSIndexPath] = []
+        var updates: [NSIndexPath] = []
+
+        updates = reloadTabs.flatMap { tab in
+            guard let tab = tab where newTabs.indexOf(tab) != nil else {
+                return nil
+            }
+            return NSIndexPath(forRow: newTabs.indexOf(tab)!, inSection: 0)
+        }
+        for (index, tab) in newTabs.enumerate() {
+            if oldTabs.indexOf(tab) == nil {
+                inserts.append(NSIndexPath(forRow: index, inSection: 0))
             }
         }
-        delegate?.topTabsDidPressNewTab()
-        self.privateModeButton.enabled = false
-        collectionView.performBatchUpdates({ _ in
-            let count = self.collectionView.numberOfItemsInSection(0)
-            self.collectionView.insertItemsAtIndexPaths([NSIndexPath(forItem: count, inSection: 0)])
-            }, completion: { finished in
-                if finished {
-                    self.privateModeButton.enabled = true
-                    self.scrollToCurrentTab()
-                }
-        })
+
+        for (index, tab) in oldTabs.enumerate() {
+            if newTabs.indexOf(tab) == nil {
+                deletes.append(NSIndexPath(forRow: index, inSection: 0))
+            }
+        }
+
+        if self.isUpdating {
+            return
+        }
+        self.isUpdating = true
+        collectionView.performBatchUpdates({ 
+            self.collectionView.insertItemsAtIndexPaths(inserts)
+            self.collectionView.deleteItemsAtIndexPaths(deletes)
+            self.collectionView.reloadItemsAtIndexPaths(updates)
+            }) { _ in
+                self.isUpdating = false
+                self._oldTabs = []
+                self.scrollToCurrentTab()
+        }
     }
     
     func togglePrivateModeTapped() {
@@ -201,10 +238,10 @@ class TopTabsViewController: UIViewController {
         self.scrollToCurrentTab(false, centerCell: true)
     }
     
-    func closeTab() {
-        delegate?.topTabsDidPressTabs()
-    }
-    
+//    func closeTab() {
+//        delegate?.topTabsDidPressTabs()
+//    }
+
     func reloadFavicons() {
         self.collectionView.reloadData()
     }
@@ -246,6 +283,10 @@ extension TopTabsViewController: TopTabCellDelegate {
         guard let indexPath = collectionView.indexPathForCell(cell) else {
             return
         }
+        // Used by our Diff
+        let oldTabs = tabsToDisplay
+        let oldSelectedTab = tabManager.selectedTab
+
         let tab = tabsToDisplay[indexPath.item]
         var selectedTab = false
         if tab == tabManager.selectedTab {
@@ -255,7 +296,6 @@ extension TopTabsViewController: TopTabCellDelegate {
         if tabsToDisplay.count == 1 {
             tabManager.removeTab(tab)
             tabManager.selectTab(tabsToDisplay.first)
-            collectionView.reloadData()
         } else {
             var nextTab: Tab
             let currentIndex = indexPath.item
@@ -268,12 +308,11 @@ extension TopTabsViewController: TopTabCellDelegate {
             if selectedTab {
                 tabManager.selectTab(nextTab)
             }
-            self.collectionView.performBatchUpdates({
-                self.collectionView.deleteItemsAtIndexPaths([indexPath])
-                }, completion: { finished in
-                    self.collectionView.reloadData()
-            })
         }
+
+        let newTabs = tabsToDisplay
+        let newSelectedTab = tabManager.selectedTab
+        self.updateTabsFrom(oldTabs, to: newTabs, reloadTabs: [oldSelectedTab!, newSelectedTab!])
     }
 }
 
@@ -332,12 +371,14 @@ extension TopTabsViewController: UICollectionViewDataSource {
 
 extension TopTabsViewController: TabSelectionDelegate {
     func didSelectTabAtIndex(index: Int) {
+        let oldSelectedTab = tabManager.selectedTab
         let tab = tabsToDisplay[index]
         tabManager.selectTab(tab)
-        collectionView.reloadData()
-        collectionView.setNeedsDisplay()
+        let newSelectedTab = tabManager.selectedTab
+
+        self.updateTabsFrom(tabsToDisplay, to: tabsToDisplay, reloadTabs: [oldSelectedTab, newSelectedTab])
+
         delegate?.topTabsDidChangeTab()
-        scrollToCurrentTab()
     }
 }
 
@@ -359,8 +400,19 @@ extension TopTabsViewController: TabManagerDelegate {
             lastNormalTab = selected
         }
     }
-    func tabManager(tabManager: TabManager, didCreateTab tab: Tab) {}
-    func tabManager(tabManager: TabManager, didAddTab tab: Tab) {}
+    func tabManager(tabManager: TabManager, didCreateTab tab: Tab) {
+         self._oldTabs = tabsToDisplay
+
+    }
+    func tabManager(tabManager: TabManager, didAddTab tab: Tab) {
+        if self.collectionView.numberOfItemsInSection(0) == 0 {
+            return
+        }
+        if self._oldTabs.isEmpty {
+            return
+        }
+        self.updateTabsFrom(self._oldTabs, to: self.tabsToDisplay, reloadTabs: [self.tabManager.selectedTab])
+    }
     func tabManager(tabManager: TabManager, didRemoveTab tab: Tab) {}
     func tabManagerDidRestoreTabs(tabManager: TabManager) {}
     func tabManagerDidAddTabs(tabManager: TabManager) {
