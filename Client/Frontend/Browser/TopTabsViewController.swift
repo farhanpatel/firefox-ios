@@ -312,7 +312,9 @@ extension TopTabsViewController: TopTabCellDelegate {
 
         let newTabs = tabsToDisplay
         let newSelectedTab = tabManager.selectedTab
-        self.updateTabsFrom(oldTabs, to: newTabs, reloadTabs: [oldSelectedTab!, newSelectedTab!])
+        //correctly calculate which tabs to reload here!
+        self.updateTabsFrom(oldTabs, to: newTabs, reloadTabs: [])
+
     }
 }
 

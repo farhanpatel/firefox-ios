@@ -3399,7 +3399,7 @@ extension BrowserViewController: TopTabsDelegate {
     
     func topTabsDidPressNewTab() {
         let isPrivate = tabManager.selectedTab?.isPrivate ?? false
-        openBlankNewTabAndFocus(isPrivate: isPrivate)
+        openURLInNewTab(nil, isPrivate: isPrivate, isPrivileged: true)
     }
 
     func topTabsDidPressPrivateModeButton(cachedTab: Tab?) {
