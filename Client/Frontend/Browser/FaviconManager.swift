@@ -118,7 +118,8 @@ class FaviconManager: TabHelper {
                         self.noFaviconAvailable(tab, atURL: currentURL)
                     }
                 }
-                NSNotificationCenter.defaultCenter().postNotificationName(FaviconManager.FaviconDidLoad, object: nil)
+                
+                NSNotificationCenter.defaultCenter().postNotificationName(FaviconManager.FaviconDidLoad, object: tab)
             }
         }
     }

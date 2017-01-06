@@ -85,11 +85,12 @@ class TopTabsViewController: UIViewController {
 
     private var isUpdating = false
     private var _oldTabs: [Tab] = []
-    
+    private var inserts: [NSIndexPath] = []
+
     init(tabManager: TabManager) {
         self.tabManager = tabManager
         super.init(nibName: nil, bundle: nil)
-        NSNotificationCenter.defaultCenter().addObserver(self, selector: #selector(TopTabsViewController.reloadFavicons), name: FaviconManager.FaviconDidLoad, object: nil)
+        NSNotificationCenter.defaultCenter().addObserver(self, selector: #selector(TopTabsViewController.reloadFavicons(_:)), name: FaviconManager.FaviconDidLoad, object: nil)
     }
     
     deinit {
@@ -177,20 +178,22 @@ class TopTabsViewController: UIViewController {
     }
     
     func newTabTapped() {
-        if let currentTab = tabManager.selectedTab, let index = tabsToDisplay.indexOf(currentTab) {
-//            let cell  = collectionView.cellForItemAtIndexPath(NSIndexPath(forItem: index, inSection: 0)) as? TopTabCell {
-//            cell.selectedTab = false
-//            if index > 0 {
-//                cell.seperatorLine = true
-//            }
+        //Save the current state
+        for var i = 0; i<100; i++ {
+            dispatch_async(dispatch_get_main_queue()) {
+                let currentTab = self.tabManager.selectedTab
+                let oldTabs = self.tabsToDisplay
+
+                //Let TabManager do its thing (pass the event up)
+                self.delegate?.topTabsDidPressNewTab()
+
+                //Use the new state of tabs to figure out what has changed.
+                let newTabs = self.tabsToDisplay
+                let newSelectedTab = self.tabManager.selectedTab
+                self.updateTabsFrom(oldTabs, to: newTabs, reloadTabs: [])
+            }
         }
 
-        let currentTab = tabManager.selectedTab
-        let oldTabs = tabsToDisplay
-        delegate?.topTabsDidPressNewTab()
-        let newTabs = tabsToDisplay
-        let newSelectedTab = tabManager.selectedTab
-        self.updateTabsFrom(oldTabs, to: newTabs, reloadTabs: [currentTab!, newSelectedTab!])
     }
 
     func updateTabsFrom(oldTabs: [Tab], to newTabs: [Tab], reloadTabs: [Tab?]) {
@@ -199,7 +202,7 @@ class TopTabsViewController: UIViewController {
         var updates: [NSIndexPath] = []
 
         updates = reloadTabs.flatMap { tab in
-            guard let tab = tab where newTabs.indexOf(tab) != nil else {
+            guard let tab = tab where newTabs.indexOf(tab) != nil && oldTabs.indexOf(tab) != nil else {
                 return nil
             }
             return NSIndexPath(forRow: newTabs.indexOf(tab)!, inSection: 0)
@@ -216,18 +219,29 @@ class TopTabsViewController: UIViewController {
             }
         }
 
-        if self.isUpdating {
+        if self.isUpdating  {
+            self.inserts = self.inserts + inserts
             return
         }
         self.isUpdating = true
-        collectionView.performBatchUpdates({ 
-            self.collectionView.insertItemsAtIndexPaths(inserts)
-            self.collectionView.deleteItemsAtIndexPaths(deletes)
-            self.collectionView.reloadItemsAtIndexPaths(updates)
+        let oldInserts = self.inserts
+        self.inserts = []
+        oldInserts.forEach { print("old inserts \($0.row)") }
+        inserts.forEach { print("current inserts \($0.row)") }
+        print("number of items in datastore  BEFORE UPDATE \(self.tabsToDisplay.count)")
+        collectionView.performBatchUpdates({
+            let cInserts = oldInserts + inserts
+            cInserts.forEach { print("animating \($0.row)") }
+            self.collectionView.insertItemsAtIndexPaths(cInserts)
+           // self.collectionView.deleteItemsAtIndexPaths(deletes)
+          //  self.collectionView.reloadItemsAtIndexPaths(updates)
+        //    self.inserts = []
+            print("number of items in datastore \(self.tabsToDisplay.count)")
+             self.isUpdating = false
             }) { _ in
-                self.isUpdating = false
-                self._oldTabs = []
-                self.scrollToCurrentTab()
+
+                //self._oldTabs = []
+                print("number of items in datastore AFTER UPDATE \(self.tabsToDisplay.count)")
         }
     }
     
@@ -237,13 +251,13 @@ class TopTabsViewController: UIViewController {
         self.collectionView.reloadData()
         self.scrollToCurrentTab(false, centerCell: true)
     }
-    
-//    func closeTab() {
-//        delegate?.topTabsDidPressTabs()
-//    }
 
-    func reloadFavicons() {
-        self.collectionView.reloadData()
+    func reloadFavicons(notification: NSNotification) {
+        if let tab = notification.object as? Tab {
+        //    self.updateTabsFrom(tabsToDisplay, to: tabsToDisplay, reloadTabs: [tab])
+        } else {
+         //   self.collectionView.reloadData()
+        }
     }
     
     func scrollToCurrentTab(animated: Bool = true, centerCell: Bool = false) {
@@ -280,40 +294,57 @@ extension TopTabsViewController: Themeable {
 
 extension TopTabsViewController: TopTabCellDelegate {
     func tabCellDidClose(cell: TopTabCell) {
-        guard let indexPath = collectionView.indexPathForCell(cell) else {
+        guard let index = collectionView.indexPathForCell(cell)?.item else {
             return
         }
         // Used by our Diff
         let oldTabs = tabsToDisplay
-        let oldSelectedTab = tabManager.selectedTab
-
-        let tab = tabsToDisplay[indexPath.item]
-        var selectedTab = false
-        if tab == tabManager.selectedTab {
-            selectedTab = true
-            delegate?.topTabsDidChangeTab()
-        }
-        if tabsToDisplay.count == 1 {
-            tabManager.removeTab(tab)
-            tabManager.selectTab(tabsToDisplay.first)
-        } else {
-            var nextTab: Tab
-            let currentIndex = indexPath.item
-            if tabsToDisplay.count-1 > currentIndex {
-                nextTab = tabsToDisplay[currentIndex+1]
+        var oldSelectedTab: Tab?
+        var newSelectedTab: Tab?
+        //10 index 5
+        let tab = tabsToDisplay[index]
+        tabManager.removeTab(tab)
+        //index 5. Tabs 9
+        if tab == oldSelectedTab {
+            // If we just closed the active tab we'll need to switch tabs and animate that change.
+            oldSelectedTab = tab
+            if tabsToDisplay.count == 1 {
+                newSelectedTab = tabsToDisplay.first
+                //8 > 5
+            } else if tabsToDisplay.count - 1 > index {
+                newSelectedTab = tabsToDisplay[index]
             } else {
-                nextTab = tabsToDisplay[currentIndex-1]
+                newSelectedTab = tabsToDisplay[index - 1]
             }
-            tabManager.removeTab(tab)
-            if selectedTab {
-                tabManager.selectTab(nextTab)
-            }
+            tabManager.selectTab(newSelectedTab)
         }
+
 
         let newTabs = tabsToDisplay
-        let newSelectedTab = tabManager.selectedTab
         //correctly calculate which tabs to reload here!
-        self.updateTabsFrom(oldTabs, to: newTabs, reloadTabs: [])
+      //  self.updateTabsFrom(oldTabs, to: newTabs, reloadTabs: [oldSelectedTab, newSelectedTab])
+
+//        var selectedTab = false
+//        if tab == tabManager.selectedTab {
+//            selectedTab = true
+//            //we havent changed tabs yet. Why we doing this now
+//            delegate?.topTabsDidChangeTab()
+//        }
+//
+//        if tabsToDisplay.count == 1 {
+//            tabManager.removeTab(tab)
+//            tabManager.selectTab(tabsToDisplay.first)
+//        } else {
+//            var nextTab: Tab
+//            let currentIndex = indexPath.item
+//            // 10 6
+//
+//            tabManager.removeTab(tab)
+//            if selectedTab {
+//                tabManager.selectTab(nextTab)
+//            }
+//        }
+
 
     }
 }
@@ -378,7 +409,7 @@ extension TopTabsViewController: TabSelectionDelegate {
         tabManager.selectTab(tab)
         let newSelectedTab = tabManager.selectedTab
 
-        self.updateTabsFrom(tabsToDisplay, to: tabsToDisplay, reloadTabs: [oldSelectedTab, newSelectedTab])
+      //  self.updateTabsFrom(tabsToDisplay, to: tabsToDisplay, reloadTabs: [oldSelectedTab, newSelectedTab])
 
         delegate?.topTabsDidChangeTab()
     }
@@ -386,11 +417,11 @@ extension TopTabsViewController: TabSelectionDelegate {
 
 extension TopTabsViewController : WKNavigationDelegate {
     func webView(webView: WKWebView, didFinishNavigation navigation: WKNavigation!) {
-        collectionView.reloadData()
+    //    collectionView.reloadData()
     }
     
     func webView(webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-        collectionView.reloadData()
+     collectionView.reloadData()
     }
 }
 
@@ -403,23 +434,21 @@ extension TopTabsViewController: TabManagerDelegate {
         }
     }
     func tabManager(tabManager: TabManager, didCreateTab tab: Tab) {
-         self._oldTabs = tabsToDisplay
+      //   self._oldTabs = tabsToDisplay
 
     }
     func tabManager(tabManager: TabManager, didAddTab tab: Tab) {
-        if self.collectionView.numberOfItemsInSection(0) == 0 {
-            return
-        }
-        if self._oldTabs.isEmpty {
-            return
-        }
-        self.updateTabsFrom(self._oldTabs, to: self.tabsToDisplay, reloadTabs: [self.tabManager.selectedTab])
+//        if self.collectionView.numberOfItemsInSection(0) == 0 {
+//            return
+//        }
+//        if self._oldTabs.isEmpty {
+//            return
+//        }
+//        self.updateTabsFrom(self._oldTabs, to: self.tabsToDisplay, reloadTabs: [self.tabManager.selectedTab])
     }
     func tabManager(tabManager: TabManager, didRemoveTab tab: Tab) {}
     func tabManagerDidRestoreTabs(tabManager: TabManager) {}
-    func tabManagerDidAddTabs(tabManager: TabManager) {
-        collectionView.reloadData()
-    }
+    func tabManagerDidAddTabs(tabManager: TabManager) {}
     func tabManagerDidRemoveAllTabs(tabManager: TabManager, toast: ButtonToast?) {
         if let privateTab = lastPrivateTab where !tabManager.tabs.contains(privateTab) {
             lastPrivateTab = nil
