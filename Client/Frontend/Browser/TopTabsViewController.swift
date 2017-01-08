@@ -109,10 +109,6 @@ class TopTabsViewController: UIViewController {
         super.viewWillAppear(animated)
         collectionView.dataSource = self
         collectionView.delegate = tabLayoutDelegate
-        collectionView.reloadData()
-        dispatch_async(dispatch_get_main_queue()) {
-           //  self.scrollToCurrentTab(false, centerCell: true)
-        }
     }
     
     override func viewDidLoad() {
@@ -256,10 +252,16 @@ class TopTabsViewController: UIViewController {
     }
     
     func togglePrivateModeTapped() {
+        // Switching to private mode triggers lots of delegate methods willAddTab/didAddTab/SelectedTab etc. 
+        // Best to just reload tableview for now. In order to do this correctly I'd need more delegate methods on TabManager.
+        // For now we can just block animations and reload manually after.
+        self.isUpdating = true
         delegate?.topTabsDidPressPrivateModeButton(isPrivate ? lastNormalTab : lastPrivateTab)
         self.privateModeButton.setSelected(isPrivate, animated: true)
         self.collectionView.reloadData()
+        self.pendingUpdates = [] //After a reload data wipe updates.
         self.scrollToCurrentTab(false, centerCell: true)
+        self.isUpdating = false
     }
 
     func reloadFavicons(notification: NSNotification) {
@@ -309,35 +311,6 @@ extension TopTabsViewController: TopTabCellDelegate {
         }
         let tab = tabsToDisplay[index]
         tabManager.removeTab(tab)
-        // Used by our Diff
-//        let oldTabs = tabsToDisplay
-//        var oldSelectedTab: Tab?
-//        var newSelectedTab: Tab?
-        //10 index 5
-//
-
-        //index 5. Tabs 9
-//        if tab == oldSelectedTab {
-            // If we just closed the active tab we'll need to switch tabs and animate that change.
-//            oldSelectedTab = tab
-//            if tabsToDisplay.count == 1 {
-//                newSelectedTab = tabsToDisplay.first
-//                //8 > 5
-//            } else if tabsToDisplay.count - 1 > index {
-//                newSelectedTab = tabsToDisplay[index]
-//            } else {
-//                newSelectedTab = tabsToDisplay[index - 1]
-//            }
-//            tabManager.selectTab(newSelectedTab)
-      //  }
-
-//        let newTabs = tabsToDisplay
-//        if tabsToDisplay.count == 1 {
-//            return
-//        }
-
-        //correctly calculate which tabs to reload here!
-     //   self.updateTabsFrom(oldTabs, to: newTabs, reloadTabs: [])
     }
 }
 
@@ -398,7 +371,6 @@ extension TopTabsViewController: TabSelectionDelegate {
     func didSelectTabAtIndex(index: Int) {
         let tab = tabsToDisplay[index]
         tabManager.selectTab(tab)
-        //delegate?.topTabsDidChangeTab()
     }
 }
 
@@ -415,11 +387,12 @@ extension TopTabsViewController: TabManagerDelegate {
             lastNormalTab = selected
         }
         if selected?.isPrivate == previous?.isPrivate && !self.tabManager.isRestoring {
-            self.updateTabsFrom(self.tabsToDisplay, to: self.tabsToDisplay, reloadTabs: [previous, selected])
+            self.updateTabsFrom(self.tabsToDisplay, to: self.tabsToDisplay, reloadTabs: [selected, previous])
         }
         if selected != nil && previous == nil && !self.tabManager.isRestoring {
             self.updateTabsFrom(self.tabsToDisplay, to: self.tabsToDisplay, reloadTabs: [selected])
         }
+
     }
 
     func tabManager(tabManager: TabManager, willAddTab tab: Tab) {
