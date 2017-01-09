@@ -2033,6 +2033,16 @@ extension BrowserViewController: SearchViewControllerDelegate {
 }
 
 extension BrowserViewController: TabManagerDelegate {
+
+    func tabManager(tabManager: TabManager, willTogglePrivateMode isPrivate: Bool) {
+
+    }
+
+
+    func tabManager(tabManager: TabManager, didTogglePrivateMode isPrivate: Bool) {
+
+    }
+
     func tabManager(tabManager: TabManager, didSelectedTabChange selected: Tab?, previous: Tab?) {
         // Remove the old accessibilityLabel. Since this webview shouldn't be visible, it doesn't need it
         // and having multiple views with the same label confuses tests.
