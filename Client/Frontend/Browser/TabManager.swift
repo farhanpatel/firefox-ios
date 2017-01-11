@@ -367,14 +367,19 @@ class TabManager: NSObject {
         //If the last item was deleted then select the last tab. Otherwise the _selectedIndex is already correct
         if let oldTab = oldSelectedTab where tab !== oldTab {
             _selectedIndex = tabs.indexOf(oldTab) ?? -1
-        } else if tabIndex == viableTabs.count {
-            tabIndex -= 1
+        } else {
+            if tabIndex == viableTabs.count {
+                tabIndex -= 1
+            }
+            // 7 < 8
+            if tabIndex < viableTabs.count && !viableTabs.isEmpty {
+                _selectedIndex = tabs.indexOf(viableTabs[tabIndex]) ?? -1
+            } else {
+                _selectedIndex = -1
+            }
         }
 
         assert(count == prevCount - 1, "Make sure the tab count was actually removed")
-        if tabIndex >= 0 {
-            _selectedIndex = tabs.indexOf(viableTabs[tabIndex])!
-        }
 
         // There's still some time between this and the webView being destroyed. We don't want to pick up any stray events.
         tab.webView?.navigationDelegate = nil
@@ -382,7 +387,6 @@ class TabManager: NSObject {
         if notify {
             delegates.forEach { $0.get()?.tabManager(self, didRemoveTab: tab) }
         }
-
 
         if !tab.isPrivate && viableTabs.isEmpty {
             addTab()
