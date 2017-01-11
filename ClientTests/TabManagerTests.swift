@@ -86,7 +86,7 @@ public class MockTabManagerDelegate: TabManagerDelegate {
     }
 
     func tabManager(tabManager: TabManager, willAddTab tab: Tab) {
-        
+        testDelegateMethodWithName(#function, tabs: [tab])
     }
 
     func tabManagerDidAddTabs(tabManager: TabManager) {
@@ -157,7 +157,7 @@ class TabManagerTests: XCTestCase {
         let delegate = MockTabManagerDelegate()
         manager.addDelegate(delegate)
 
-        let willCreate = methodSpy(functionName: "tabManager(_:didCreateTab:)")
+        let willCreate = methodSpy(functionName: "tabManager(_:willAddTab:)")
         let didAdd = methodSpy(functionName: "tabManager(_:didAddTab:)")
         delegate.methodCatchers = [willCreate, didAdd]
         manager.addTab()
@@ -175,7 +175,7 @@ class TabManagerTests: XCTestCase {
         manager.addDelegate(delegate)
 
         let didRemove = methodSpy(functionName: "tabManager(_:didRemoveTab:)")
-        let didCreate = methodSpy(functionName: "tabManager(_:didCreateTab:)")
+        let didCreate = methodSpy(functionName: "tabManager(_:willAddTab:)")
         let didAdd = methodSpy(functionName: "tabManager(_:didAddTab:)")
         let didSelect = methodSpy(functionName: "tabManager(_:didSelectedTabChange:previous:)") { tabs in
             let next = tabs[0]!
@@ -323,11 +323,11 @@ class TabManagerTests: XCTestCase {
 
         // We add 2 tabs. Then a private one before adding another normal tab and selecting the first.
         // Make sure that when the last one is deleted we dont switch to the private tab
-        manager.addTab()
+        let deleted = manager.addTab()
         let newSelected = manager.addTab()
         manager.addTab(isPrivate: true)
-        let deleted = manager.addTab()
-        manager.selectTab(manager.tabs.last)
+        manager.addTab()
+        manager.selectTab(manager.tabs.first)
         manager.addDelegate(delegate)
 
         let didRemove = methodSpy(functionName: "tabManager(_:didRemoveTab:)")
@@ -338,7 +338,7 @@ class TabManagerTests: XCTestCase {
             XCTAssertEqual(next, newSelected)
         }
         delegate.methodCatchers = [didRemove, didSelect]
-        manager.removeTab(manager.tabs.last!)
+        manager.removeTab(manager.tabs.first!)
 
         XCTAssertTrue(delegate.methodCatchers.isEmpty, "Not all delegate methods were called")
     }
