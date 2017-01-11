@@ -2191,7 +2191,7 @@ extension BrowserViewController: TabManagerDelegate {
         if let selectedTab = tabManager.selectedTab {
             let count = selectedTab.isPrivate ? tabManager.privateTabs.count : tabManager.normalTabs.count
             urlBar.updateTabCount(max(count, 1), animated: animated)
-            //topTabsViewController?.updateTabCount(max(count, 1), animated: animated)
+            topTabsViewController?.updateTabCount(max(count, 1), animated: animated)
         }
     }
 }
