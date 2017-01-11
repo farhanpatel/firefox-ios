@@ -11,8 +11,9 @@ private let log = Logger.browserLogger
 
 protocol TabManagerDelegate: class {
     func tabManager(tabManager: TabManager, didSelectedTabChange selected: Tab?, previous: Tab?)
-    func tabManager(tabManager: TabManager, didCreateTab tab: Tab)
+    func tabManager(tabManager: TabManager, willAddTab tab: Tab)
     func tabManager(tabManager: TabManager, didAddTab tab: Tab)
+    func tabManager(tabManager: TabManager, willRemoveTab tab: Tab)
     func tabManager(tabManager: TabManager, didRemoveTab tab: Tab)
     func tabManagerDidRestoreTabs(tabManager: TabManager)
     func tabManagerDidAddTabs(tabManager: TabManager)
@@ -284,7 +285,7 @@ class TabManager: NSObject {
         assert(NSThread.isMainThread())
 
         for delegate in delegates {
-            delegate.get()?.tabManager(self, didCreateTab: tab)
+            delegate.get()?.tabManager(self, willAddTab: tab)
         }
 
         if parent == nil || parent?.isPrivate != tab.isPrivate {
@@ -345,19 +346,35 @@ class TabManager: NSObject {
 
         let oldSelectedTab = selectedTab
 
+        if notify {
+            delegates.forEach { $0.get()?.tabManager(self, willRemoveTab: tab) }
+        }
+
+        // The index of the tab in its respective tab grouping. Used to figure out which tab is next
+        var tabIndex: Int = -1
+        if let oldTab = oldSelectedTab {
+            tabIndex = (tab.isPrivate ? privateTabs.indexOf(oldTab) : normalTabs.indexOf(oldTab)) ?? -1
+        }
+
+
         let prevCount = count
         if let removalIndex = tabs.indexOf({ $0 === tab }) {
             tabs.removeAtIndex(removalIndex)
         }
 
+        let viableTabs: [Tab] = tab.isPrivate ? privateTabs : normalTabs
+
         //If the last item was deleted then select the last tab. Otherwise the _selectedIndex is already correct
         if let oldTab = oldSelectedTab where tab !== oldTab {
             _selectedIndex = tabs.indexOf(oldTab) ?? -1
-        } else if _selectedIndex == count {
-            _selectedIndex -= 1
+        } else if tabIndex == viableTabs.count {
+            tabIndex -= 1
         }
 
         assert(count == prevCount - 1, "Make sure the tab count was actually removed")
+        if tabIndex >= 0 {
+            _selectedIndex = tabs.indexOf(viableTabs[tabIndex])!
+        }
 
         // There's still some time between this and the webView being destroyed. We don't want to pick up any stray events.
         tab.webView?.navigationDelegate = nil
@@ -366,7 +383,6 @@ class TabManager: NSObject {
             delegates.forEach { $0.get()?.tabManager(self, didRemoveTab: tab) }
         }
 
-        let viableTabs: [Tab] = tab.isPrivate ? privateTabs : normalTabs
 
         if !tab.isPrivate && viableTabs.isEmpty {
             addTab()
