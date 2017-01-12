@@ -240,8 +240,8 @@ class TopTabsViewController: UIViewController {
             self.isUpdating = false
         }) { _ in
             print("number of items in datastore AFTER UPDATE \(self.tabsToDisplay.count)")
-            if self.pendingUpdates.isEmpty && !self.isUpdating {
-                self.scrollToCurrentTab()
+            if self.pendingUpdates.isEmpty && !self.isUpdating && !combinedUpdate.inserts.isEmpty {
+                //self.scrollToCurrentTab()
             }
         }
     }
@@ -414,7 +414,10 @@ extension TopTabsViewController: TabManagerDelegate {
     }
 
     func tabManager(tabManager: TabManager, didAddTab tab: Tab) {
-        if self.tabManager.isRestoring || tab.isPrivate != tabManager.selectedTab?.isPrivate {
+        if self.tabManager.isRestoring {
+            return
+        }
+        if tabManager.selectedTab != nil && tab.isPrivate != tabManager.selectedTab?.isPrivate {
             return
         }
         let oldTabs = _oldTabs
