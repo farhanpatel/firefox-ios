@@ -26,7 +26,7 @@ struct TopTabsUX {
 protocol TopTabsDelegate: class {
     func topTabsDidPressTabs()
     func topTabsDidPressNewTab()
-    func topTabsDidPressPrivateModeButton(cachedTab: Tab?)
+    func topTabsDidPressPrivateModeButton()
     func topTabsDidChangeTab()
 }
 
@@ -223,6 +223,8 @@ class TopTabsViewController: UIViewController {
     }
 
     func updateTabsFrom(oldTabs: [Tab], to newTabs: [Tab], reloadTabs: [Tab?]) {
+        assertIsMainThread("Updates can only be performed from the main thread")
+         print("\(#function) with isUpdate \(self.isUpdating)")
         self.pendingUpdates.append(self.calculateDiffWith(oldTabs, to: newTabs, and: reloadTabs))
         if self.isUpdating  {
             return
@@ -230,7 +232,7 @@ class TopTabsViewController: UIViewController {
         self.isUpdating = true
         let updates = self.pendingUpdates
         self.pendingUpdates = []
-
+         print("\(#function) before update isUpdate \(self.isUpdating)")
         print("number of items in datastore  BEFORE UPDATE \(self.tabsToDisplay.count)")
         let combinedUpdate = tableUpdate(updates: updates)
         self.collectionView.performBatchUpdates({
@@ -239,6 +241,10 @@ class TopTabsViewController: UIViewController {
             self.collectionView.insertItemsAtIndexPaths(Array(combinedUpdate.inserts))
             self.isUpdating = false
         }) { _ in
+            if !newTabs.every({ (tab) -> Bool in return self.tabsToDisplay.indexOf(tab) != nil }) {
+                self.reloadData()
+            }
+            print("\(#function) after update isUpdate \(self.isUpdating)")
             print("number of items in datastore AFTER UPDATE \(self.tabsToDisplay.count)")
             if self.pendingUpdates.isEmpty && !self.isUpdating && !combinedUpdate.inserts.isEmpty {
                 //self.scrollToCurrentTab()
@@ -252,6 +258,7 @@ class TopTabsViewController: UIViewController {
     }
 
     private func reloadData() {
+        print("\(#function) before update isUpdate \(self.isUpdating)")
         isUpdating = true
         collectionView.reloadData()
         flushPendingChanges()
@@ -262,6 +269,7 @@ class TopTabsViewController: UIViewController {
     func togglePrivateModeTapped() {
         //Block any animations that might start 
         //For example adding a new private tab shouldnt trigger an update
+        print("\(#function) with isUpdate \(self.isUpdating)")
         self.isUpdating = true
 
         let oldSelectedTab = self._oldSelectedTab
@@ -283,12 +291,22 @@ class TopTabsViewController: UIViewController {
         }
     }
 
+    /*
+     order of events
+     //delete last tab
+     //create a new tab
+     //select the new tab
+     //fire the reloadFavicons
+     //reload for private mode
+ */
+
     func reloadFavicons(notification: NSNotification) {
-        if let tab = notification.object as? Tab {
-            self.updateTabsFrom(tabsToDisplay, to: tabsToDisplay, reloadTabs: [tab])
-        } else {
-            self.reloadData()
+        dispatch_async(dispatch_get_main_queue()) {
+            if let tab = notification.object as? Tab {
+                self.updateTabsFrom(self.tabsToDisplay, to: self.tabsToDisplay, reloadTabs: [tab])
+            }
         }
+
     }
     
     func scrollToCurrentTab(animated: Bool = true, centerCell: Bool = false) {
@@ -400,6 +418,7 @@ extension TopTabsViewController : WKNavigationDelegate {
 
 extension TopTabsViewController: TabManagerDelegate {
     func tabManager(tabManager: TabManager, didSelectedTabChange selected: Tab?, previous: Tab?) {
+         print("\(#function) with isUpdate \(self.isUpdating)")
         if selected?.isPrivate != previous?.isPrivate && previous != nil {
             self.reloadData()
             return
@@ -417,6 +436,7 @@ extension TopTabsViewController: TabManagerDelegate {
         if self.tabManager.isRestoring {
             return
         }
+         print("\(#function) with isUpdate \(self.isUpdating)")
         if tabManager.selectedTab != nil && tab.isPrivate != tabManager.selectedTab?.isPrivate {
             return
         }

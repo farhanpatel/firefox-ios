@@ -18,6 +18,7 @@ import WebImage
 
 private let log = Logger.browserLogger
 
+
 private let KVOLoading = "loading"
 private let KVOEstimatedProgress = "estimatedProgress"
 private let KVOURL = "URL"
@@ -1254,7 +1255,7 @@ class BrowserViewController: UIViewController {
 
     override var keyCommands: [UIKeyCommand]? {
         return [
-            UIKeyCommand(input: "r", modifierFlags: .Command, action: #selector(BrowserViewController.reloadTab), discoverabilityTitle: Strings.ReloadPageTitle),
+            UIKeyCommand(input: "t", modifierFlags: .Command, action: #selector(BrowserViewController.reloadTab), discoverabilityTitle: Strings.ReloadPageTitle),
             UIKeyCommand(input: "[", modifierFlags: .Command, action: #selector(BrowserViewController.goBack), discoverabilityTitle: Strings.BackTitle),
             UIKeyCommand(input: UIKeyInputLeftArrow, modifierFlags: .Command, action: #selector(BrowserViewController.goBack), discoverabilityTitle: Strings.BackTitle),
             UIKeyCommand(input: "]", modifierFlags: .Command, action: #selector(BrowserViewController.goForward), discoverabilityTitle: Strings.ForwardTitle),
@@ -1262,7 +1263,7 @@ class BrowserViewController: UIViewController {
 
             UIKeyCommand(input: "f", modifierFlags: .Command, action: #selector(BrowserViewController.findOnPage), discoverabilityTitle: Strings.FindTitle),
             UIKeyCommand(input: "l", modifierFlags: .Command, action: #selector(BrowserViewController.selectLocationBar), discoverabilityTitle: Strings.SelectLocationBarTitle),
-            UIKeyCommand(input: "t", modifierFlags: .Command, action: #selector(BrowserViewController.newTab), discoverabilityTitle: Strings.NewTabTitle),
+            UIKeyCommand(input: "r", modifierFlags: .Command, action: #selector(BrowserViewController.newTab), discoverabilityTitle: Strings.NewTabTitle),
             UIKeyCommand(input: "p", modifierFlags: [.Command, .Shift], action: #selector(BrowserViewController.newPrivateTab), discoverabilityTitle: Strings.NewPrivateTabTitle),
             UIKeyCommand(input: "w", modifierFlags: .Command, action: #selector(BrowserViewController.closeTab), discoverabilityTitle: Strings.CloseTabTitle),
             UIKeyCommand(input: "\t", modifierFlags: .Control, action: #selector(BrowserViewController.nextTab), discoverabilityTitle: Strings.ShowNextTabTitle),
@@ -3415,7 +3416,7 @@ extension BrowserViewController: TopTabsDelegate {
         openURLInNewTab(nil, isPrivate: isPrivate, isPrivileged: true)
     }
 
-    func topTabsDidPressPrivateModeButton(cachedTab: Tab?) {
+    func topTabsDidPressPrivateModeButton() {
         guard let selectedTab = tabManager.selectedTab else {
             return
         }
@@ -3424,18 +3425,6 @@ extension BrowserViewController: TopTabsDelegate {
         if selectedTab.isPrivate {
             if profile.prefs.boolForKey("settings.closePrivateTabs") ?? false {
                 tabManager.removeAllPrivateTabsAndNotify(false)
-            }
-        }
-        
-        if let tab = cachedTab {
-            tabManager.selectTab(tab)
-        } else if selectedTab.isPrivate {
-            tabManager.selectTab(tabManager.normalTabs.last)
-        } else {
-            if let privateTab = tabManager.privateTabs.last {
-                tabManager.selectTab(privateTab)
-            } else {
-                openBlankNewTabAndFocus(isPrivate: true)
             }
         }
     }
