@@ -26,23 +26,13 @@ struct TopTabsUX {
 protocol TopTabsDelegate: class {
     func topTabsDidPressTabs()
     func topTabsDidPressNewTab(isPrivate: Bool)
+
     func topTabsDidPressPrivateModeButton()
     func topTabsDidChangeTab()
 }
 
 protocol TopTabCellDelegate: class {
     func tabCellDidClose(cell: TopTabCell)
-}
-
-class Seperator: UICollectionReusableView {
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        self.backgroundColor = UIColor.redColor()
-    }
-    
-    required init?(coder aDecoder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
 }
 
 class TopTabsViewController: UIViewController {
@@ -166,7 +156,6 @@ class TopTabsViewController: UIViewController {
             applyTheme(currentTab.isPrivate ? Theme.PrivateMode : Theme.NormalMode)
         }
         updateTabCount(tabsToDisplay.count)
-
     }
     
     func switchForegroundStatus(isInForeground reveal: Bool) {
@@ -194,121 +183,7 @@ class TopTabsViewController: UIViewController {
         }
     }
 
-    struct tableUpdate {
-        let reloads: Set<NSIndexPath>
-        let inserts: Set<NSIndexPath>
-        let deletes: Set<NSIndexPath>
-
-        init(updates: [tableUpdate]) {
-            reloads = Set(updates.flatMap { $0.reloads })
-            inserts = Set(updates.flatMap { $0.inserts })
-            deletes = Set(updates.flatMap { $0.deletes })
-        }
-
-        init(reloadArr: [NSIndexPath], insertArr: [NSIndexPath], deleteArr: [NSIndexPath]) {
-            reloads = Set(reloadArr)
-            inserts = Set(insertArr)
-            deletes = Set(deleteArr)
-        }
-
-        func isEmpty() -> Bool {
-            return inserts.isEmpty && reloads.isEmpty && deletes.isEmpty
-        }
-    }
-
-    // create a tableUpdate which is a snapshot of updates to perfrom on a collectionView
-    func calculateDiffWith(oldTabs: [Tab], to newTabs: [Tab], and reloadTabs: [Tab?]) -> tableUpdate {
-        let reloads: [NSIndexPath] = reloadTabs.flatMap { tab in
-            guard let tab = tab where newTabs.indexOf(tab) != nil else {
-                return nil
-            }
-            return NSIndexPath(forRow: newTabs.indexOf(tab)!, inSection: 0)
-        }
-
-        let inserts: [NSIndexPath] = newTabs.enumerate().flatMap { index, tab in
-            if oldTabs.indexOf(tab) == nil {
-                return NSIndexPath(forRow: index, inSection: 0)
-            }
-            return nil
-        }
-
-        let deletes: [NSIndexPath] = oldTabs.enumerate().flatMap { index, tab in
-            if newTabs.indexOf(tab) == nil {
-                return NSIndexPath(forRow: index, inSection: 0)
-            }
-            return nil
-        }
-        return tableUpdate(reloadArr: reloads, insertArr: inserts, deleteArr: deletes)
-    }
-
-    func updateTabsFrom(oldTabs: [Tab], to newTabs: [Tab], reloadTabs: [Tab?]) {
-        assertIsMainThread("Updates can only be performed from the main thread")
-
-        self.pendingUpdates.append(self.calculateDiffWith(oldTabs, to: newTabs, and: reloadTabs))
-        if self.isUpdating || self.pendingReloadData {
-            return
-        }
-
-        self.isUpdating = true
-        let updates = self.pendingUpdates
-        self.flushPendingChanges()
-        let update = tableUpdate(updates: updates)
-
-        performUpdateWithChanges(update) { (_) in
-            // This handles the edge case where, during the animation we've toggled private mode
-            // Because we dont have a proper way of knowing when this transition is about to happen we have to do this check here
-            print("number of items in datastore AFTER UPDATE \(self.tabsToDisplay.count)")
-            if  !self.tabsMatchDisplayGroup(newTabs.first, b: self.tabsToDisplay.first) || self.pendingReloadData {
-                self.reloadData()
-            } else if self.pendingUpdates.isEmpty && !self.isUpdating && !update.inserts.isEmpty {
-                self.scrollToCurrentTab()
-            }
-        }
-    }
-
-    func performUpdateWithChanges(update: tableUpdate, completion: (Bool)-> Void) {
-        //Speed up the animation a bit to make it feel snappier
-        let newUpdates = update.reloads.filter { self.tabsToDisplay.count  > $0.row  }
-        UIView.animateWithDuration(0.1) {
-            self.collectionView.performBatchUpdates({
-                self.collectionView.deleteItemsAtIndexPaths(Array(update.deletes))
-                self.collectionView.reloadItemsAtIndexPaths(Array(newUpdates))
-                self.collectionView.insertItemsAtIndexPaths(Array(update.inserts))
-                self.isUpdating = false
-            }, completion: completion)
-        }
-    }
-
-    private func flushPendingChanges() {
-        _oldTabs.removeAll()
-        pendingUpdates.removeAll()
-    }
-
-    private func reloadData() {
-        assertIsMainThread("reloadData must only be called from main thread")
-
-        if self.isUpdating {
-            self.pendingReloadData = true
-            return
-        }
-
-        isUpdating = true
-        self.newTab.userInteractionEnabled = false
-        UIView.animateWithDuration(0.2, animations: {
-            self.collectionView.reloadData()
-            self.collectionView.collectionViewLayout.invalidateLayout()
-            self.collectionView.layoutIfNeeded()
-            self.scrollToCurrentTab(true, centerCell: true)
-            }) { (_) in
-                self.flushPendingChanges()
-                self.isUpdating = false
-                self.pendingReloadData = false
-                self.newTab.userInteractionEnabled = true
-        }
-    }
-
     func togglePrivateModeTapped() {
-
         if isUpdating || pendingReloadData {
             return
         }
@@ -436,6 +311,123 @@ extension TopTabsViewController: TabSelectionDelegate {
     func didSelectTabAtIndex(index: Int) {
         let tab = tabsToDisplay[index]
         tabManager.selectTab(tab)
+    }
+}
+
+// Collection Diff (animations)
+extension TopTabsViewController {
+
+    struct tableUpdate {
+        let reloads: Set<NSIndexPath>
+        let inserts: Set<NSIndexPath>
+        let deletes: Set<NSIndexPath>
+
+        init(updates: [tableUpdate]) {
+            reloads = Set(updates.flatMap { $0.reloads })
+            inserts = Set(updates.flatMap { $0.inserts })
+            deletes = Set(updates.flatMap { $0.deletes })
+        }
+
+        init(reloadArr: [NSIndexPath], insertArr: [NSIndexPath], deleteArr: [NSIndexPath]) {
+            reloads = Set(reloadArr)
+            inserts = Set(insertArr)
+            deletes = Set(deleteArr)
+        }
+
+        func isEmpty() -> Bool {
+            return inserts.isEmpty && reloads.isEmpty && deletes.isEmpty
+        }
+    }
+
+    // create a tableUpdate which is a snapshot of updates to perfrom on a collectionView
+    func calculateDiffWith(oldTabs: [Tab], to newTabs: [Tab], and reloadTabs: [Tab?]) -> tableUpdate {
+        let reloads: [NSIndexPath] = reloadTabs.flatMap { tab in
+            guard let tab = tab where newTabs.indexOf(tab) != nil else {
+                return nil
+            }
+            return NSIndexPath(forRow: newTabs.indexOf(tab)!, inSection: 0)
+        }
+
+        let inserts: [NSIndexPath] = newTabs.enumerate().flatMap { index, tab in
+            if oldTabs.indexOf(tab) == nil {
+                return NSIndexPath(forRow: index, inSection: 0)
+            }
+            return nil
+        }
+
+        let deletes: [NSIndexPath] = oldTabs.enumerate().flatMap { index, tab in
+            if newTabs.indexOf(tab) == nil {
+                return NSIndexPath(forRow: index, inSection: 0)
+            }
+            return nil
+        }
+        return tableUpdate(reloadArr: reloads, insertArr: inserts, deleteArr: deletes)
+    }
+
+    func updateTabsFrom(oldTabs: [Tab], to newTabs: [Tab], reloadTabs: [Tab?]) {
+        assertIsMainThread("Updates can only be performed from the main thread")
+
+        self.pendingUpdates.append(self.calculateDiffWith(oldTabs, to: newTabs, and: reloadTabs))
+        if self.isUpdating || self.pendingReloadData {
+            return
+        }
+
+        self.isUpdating = true
+        let updates = self.pendingUpdates
+        self.flushPendingChanges()
+        let update = tableUpdate(updates: updates)
+
+        performUpdateWithChanges(update) { (_) in
+            // This handles the edge case where, during the animation we've toggled private mode
+            // Because we dont have a proper way of knowing when this transition is about to happen we have to do this check here
+            print("number of items in datastore AFTER UPDATE \(self.tabsToDisplay.count)")
+            if  !self.tabsMatchDisplayGroup(newTabs.first, b: self.tabsToDisplay.first) || self.pendingReloadData {
+                self.reloadData()
+            } else if self.pendingUpdates.isEmpty && !self.isUpdating && !update.inserts.isEmpty {
+                self.scrollToCurrentTab()
+            }
+        }
+    }
+
+    func performUpdateWithChanges(update: tableUpdate, completion: (Bool)-> Void) {
+        //Speed up the animation a bit to make it feel snappier
+        let newUpdates = update.reloads.filter { self.tabsToDisplay.count  > $0.row }
+        UIView.animateWithDuration(0.1) {
+            self.collectionView.performBatchUpdates({
+                self.collectionView.deleteItemsAtIndexPaths(Array(update.deletes))
+                self.collectionView.reloadItemsAtIndexPaths(Array(newUpdates))
+                self.collectionView.insertItemsAtIndexPaths(Array(update.inserts))
+                self.isUpdating = false
+                }, completion: completion)
+        }
+    }
+
+    private func flushPendingChanges() {
+        _oldTabs.removeAll()
+        pendingUpdates.removeAll()
+    }
+
+    private func reloadData() {
+        assertIsMainThread("reloadData must only be called from main thread")
+
+        if self.isUpdating {
+            self.pendingReloadData = true
+            return
+        }
+
+        isUpdating = true
+        self.newTab.userInteractionEnabled = false
+        UIView.animateWithDuration(0.2, animations: {
+            self.collectionView.reloadData()
+            self.collectionView.collectionViewLayout.invalidateLayout()
+            self.collectionView.layoutIfNeeded()
+            self.scrollToCurrentTab(true, centerCell: true)
+        }) { (_) in
+            self.flushPendingChanges()
+            self.isUpdating = false
+            self.pendingReloadData = false
+            self.newTab.userInteractionEnabled = true
+        }
     }
 }
 

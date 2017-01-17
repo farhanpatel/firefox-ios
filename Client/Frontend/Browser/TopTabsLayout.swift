@@ -49,53 +49,44 @@ class TopTabsViewLayout: UICollectionViewFlowLayout {
         return true
     }
 
+    // MARK: layoutAttributesForElementsInRect
     override func layoutAttributesForDecorationViewOfKind(elementKind: String, atIndexPath indexPath: NSIndexPath) -> UICollectionViewLayoutAttributes? {
-        let layout = super.layoutAttributesForDecorationViewOfKind(elementKind, atIndexPath: indexPath)
-        print("row from layout is  \(layout?.indexPath.row) and we are at \(indexPath.row)")
-        if let z = self.decorationAttributeArr[indexPath.row] {
-            return z
+        if let attr = self.decorationAttributeArr[indexPath.row] {
+            return attr
         } else {
-            print("not found")
-            let sep = UICollectionViewLayoutAttributes(forDecorationViewOfKind: "Seperator", withIndexPath: indexPath)
-            sep.frame = CGRect.zero
-            sep.zIndex = -1
-
-            return sep
+            // Sometimes decoration views will be requested for rows that might not exist. Just show an empty seperator.
+            let seperatorAttr = UICollectionViewLayoutAttributes(forDecorationViewOfKind: "Seperator", withIndexPath: indexPath)
+            seperatorAttr.frame = CGRect.zero
+            seperatorAttr.zIndex = -1
+            return seperatorAttr
         }
     }
 
-    // MARK: layoutAttributesForElementsInRect
     override func layoutAttributesForElementsInRect(rect: CGRect) -> [UICollectionViewLayoutAttributes]? {
         var attributes = super.layoutAttributesForElementsInRect(rect)!
         
         // Create decoration attributes
         let decorationAttributes = TopTabsViewLayoutAttributes(forDecorationViewOfKind: TopTabsBackgroundDecorationView.Identifier, withIndexPath: NSIndexPath(forRow: 0, inSection: 0))
-
-        // Make the decoration view span the entire row
         let size = collectionViewContentSize()
-        decorationAttributes.frame = CGRectMake(-(TopTabsUX.TopTabsBackgroundPadding-TopTabsUX.TopTabsBackgroundShadowWidth*2)/2, 0, size.width+(TopTabsUX.TopTabsBackgroundPadding-TopTabsUX.TopTabsBackgroundShadowWidth*2), size.height)
-        
-        // Set the zIndex to be behind the item
+        let offset = TopTabsUX.TopTabsBackgroundPadding-TopTabsUX.TopTabsBackgroundShadowWidth * 2
+        decorationAttributes.frame = CGRectMake(-(offset)/2, 0, size.width + offset, size.height)
         decorationAttributes.zIndex = -1
-        
-        // Set the style (light or dark)
         decorationAttributes.themeColor = self.themeColor
-        
-        // Add the attribute to the list
-      //  decorationAttributeArr.removeAll()
-        var arr: [Int: UICollectionViewLayoutAttributes] = [:]
+
+        // Create attributes for the Tab Seperator.
+        var seperatorArr: [Int: UICollectionViewLayoutAttributes] = [:]
         for i in attributes {
             if i.indexPath.item > 0 {
                 let sep = UICollectionViewLayoutAttributes(forDecorationViewOfKind: "Seperator", withIndexPath: i.indexPath)
-                sep.frame = CGRect(x: i.frame.origin.x - 2, y: i.frame.origin.y, width: 2, height: i.frame.size.height)
+                sep.frame = CGRect(x: i.frame.origin.x - 2, y: i.frame.size.height / 4 , width: 1, height: i.frame.size.height / 2)
                 sep.zIndex = -1
-                arr[i.indexPath.row] = sep
+                seperatorArr[i.indexPath.row] = sep
                 attributes.append(sep)
             }
         }
-        self.decorationAttributeArr = arr
-        attributes.append(decorationAttributes)
 
+        self.decorationAttributeArr = seperatorArr
+        attributes.append(decorationAttributes)
         return attributes
     }
 }
