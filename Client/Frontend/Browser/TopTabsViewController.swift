@@ -166,6 +166,7 @@ class TopTabsViewController: UIViewController {
             applyTheme(currentTab.isPrivate ? Theme.PrivateMode : Theme.NormalMode)
         }
         updateTabCount(tabsToDisplay.count)
+
     }
     
     func switchForegroundStatus(isInForeground reveal: Bool) {
@@ -259,9 +260,7 @@ class TopTabsViewController: UIViewController {
             print("number of items in datastore AFTER UPDATE \(self.tabsToDisplay.count)")
             if  !self.tabsMatchDisplayGroup(newTabs.first, b: self.tabsToDisplay.first) || self.pendingReloadData {
                 self.reloadData()
-            }
-
-            if self.pendingUpdates.isEmpty && !self.isUpdating && !update.inserts.isEmpty {
+            } else if self.pendingUpdates.isEmpty && !self.isUpdating && !update.inserts.isEmpty {
                 self.scrollToCurrentTab()
             }
         }
@@ -295,8 +294,7 @@ class TopTabsViewController: UIViewController {
 
         isUpdating = true
         self.newTab.userInteractionEnabled = false
-        print("after update we will be showing privatetabs \(isPrivate)")
-        UIView.animateWithDuration(0.2, animations: { 
+        UIView.animateWithDuration(0.2, animations: {
             self.collectionView.reloadData()
             self.collectionView.collectionViewLayout.invalidateLayout()
             self.collectionView.layoutIfNeeded()
@@ -341,10 +339,11 @@ class TopTabsViewController: UIViewController {
                 self.updateTabsFrom(self.tabsToDisplay, to: self.tabsToDisplay, reloadTabs: [tab])
             }
         }
-
     }
     
     func scrollToCurrentTab(animated: Bool = true, centerCell: Bool = false) {
+        assertIsMainThread("Only animate on the main thread")
+
         guard let currentTab = tabManager.selectedTab, let index = tabsToDisplay.indexOf(currentTab) where !collectionView.frame.isEmpty else {
             return
         }
@@ -410,12 +409,6 @@ extension TopTabsViewController: UICollectionViewDataSource {
         }
 
         tabCell.selectedTab = (tab == tabManager.selectedTab)
-        
-//        if index > 0 && index < tabsToDisplay.count && tabsToDisplay[index] != tabManager.selectedTab && tabsToDisplay[index-1] != tabManager.selectedTab {
-//            tabCell.seperatorLine = true
-//        } else {
-//            tabCell.seperatorLine = false
-//        }
 
         if let favIcon = tab.displayFavicon,
            let url = NSURL(string: favIcon.url) {
@@ -446,11 +439,6 @@ extension TopTabsViewController: TabSelectionDelegate {
     }
 }
 
-extension TopTabsViewController : WKNavigationDelegate {
-    func webView(webView: WKWebView, didFinishNavigation navigation: WKNavigation!) {}
-    func webView(webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {}
-}
-
 extension TopTabsViewController: TabManagerDelegate {
 
     // Because we don't know when we are about to transition to private mode
@@ -462,22 +450,20 @@ extension TopTabsViewController: TabManagerDelegate {
         return false
     }
 
-    func tabManager(tabManager: TabManager, didTogglePrivateTabs isPrivate: Bool) {
-        if isPrivate == self.isPrivate {
-            self.reloadData()
-        }
+    // This helps make sure animations don't happen before the view is loaded.
+    private var isRestoring: Bool {
+        return self.tabManager.isRestoring || self.collectionView.frame == CGRect.zero
     }
 
     func tabManager(tabManager: TabManager, didSelectedTabChange selected: Tab?, previous: Tab?) {
-
-        if self.tabManager.isRestoring {
+        if isRestoring {
             return
         }
 
         if !tabsMatchDisplayGroup(selected, b: previous) {
+            self.reloadData()
         } else {
             print("about to update \(#function)")
-            //also update the tabs around these 2 so seperators update :/ super lame
             self.updateTabsFrom(self.tabsToDisplay, to: self.tabsToDisplay, reloadTabs: [selected, previous])
         }
     }
@@ -487,13 +473,12 @@ extension TopTabsViewController: TabManagerDelegate {
     }
 
     func tabManager(tabManager: TabManager, didAddTab tab: Tab) {
-        assertIsMainThread("addTab from main thread")
-        if self.tabManager.isRestoring || (tabManager.selectedTab != nil && !tabsMatchDisplayGroup(tab, b: tabManager.selectedTab)) {
+        if isRestoring || (tabManager.selectedTab != nil && !tabsMatchDisplayGroup(tab, b: tabManager.selectedTab)) {
             return
         }
+
         let oldTabs = _oldTabs
         _oldTabs = []
-        print("tab is tab. \(tab.isPrivate)")
 
         print("about to update \(#function)")
         self.updateTabsFrom(oldTabs, to: self.tabsToDisplay, reloadTabs: [self.tabManager.selectedTab])
@@ -504,7 +489,7 @@ extension TopTabsViewController: TabManagerDelegate {
     }
 
     func tabManager(tabManager: TabManager, didRemoveTab tab: Tab) {
-        if self.tabManager.isRestoring {
+        if isRestoring {
             return
         }
         let oldTabs = _oldTabs
@@ -512,16 +497,13 @@ extension TopTabsViewController: TabManagerDelegate {
             _oldSelectedTab = nil
         }
         _oldTabs = []
-        // reload the next tab 
-        print("about to update \(#function)")
         self.updateTabsFrom(oldTabs, to: self.tabsToDisplay, reloadTabs: [])
     }
 
     func tabManagerDidRestoreTabs(tabManager: TabManager) {
-        print("about to reload \(#function)")
         self.collectionView.reloadData()
-       // self.reloadData()
     }
+
     func tabManagerDidAddTabs(tabManager: TabManager) {}
     func tabManagerDidRemoveAllTabs(tabManager: TabManager, toast: ButtonToast?) {}
 }

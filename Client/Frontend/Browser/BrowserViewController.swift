@@ -232,7 +232,6 @@ class BrowserViewController: UIViewController {
                     make.height.equalTo(TopTabsUX.TopTabsViewHeight)
                 }
                 self.topTabsViewController = topTabsViewController
-                tabManager.addNavigationDelegate(topTabsViewController)
             }
             topTabsContainer.snp_updateConstraints { make in
                 make.height.equalTo(TopTabsUX.TopTabsViewHeight)

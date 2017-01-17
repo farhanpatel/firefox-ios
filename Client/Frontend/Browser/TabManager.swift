@@ -15,7 +15,6 @@ protocol TabManagerDelegate: class {
     func tabManager(tabManager: TabManager, didAddTab tab: Tab)
     func tabManager(tabManager: TabManager, willRemoveTab tab: Tab)
     func tabManager(tabManager: TabManager, didRemoveTab tab: Tab)
-    func tabManager(tabManager: TabManager, didTogglePrivateTabs isPrivate: Bool)
 
     func tabManagerDidRestoreTabs(tabManager: TabManager)
     func tabManagerDidAddTabs(tabManager: TabManager)
@@ -192,11 +191,6 @@ class TabManager: NSObject {
             delegate.get()?.tabManager(self, didSelectedTabChange: tab, previous: previous)
         }
 
-        if let sel = selectedTab, let prev = previous where sel.isPrivate != prev.isPrivate {
-            for delegate in delegates {
-                delegate.get()?.tabManager(self, didTogglePrivateTabs: sel.isPrivate)
-            }
-        }
     }
 
     func expireSnackbars() {
@@ -467,8 +461,11 @@ class TabManager: NSObject {
             removeTabs(tabsCopy)
         }
         selectTab(tempTabs.first)
-        self.tempTabs?.removeAll()
         self.isRestoring = false
+        for delegate in delegates {
+            delegate.get()?.tabManagerDidRestoreTabs(self)
+        }
+        self.tempTabs?.removeAll()
         tabs.first?.createWebview()
     }
     
