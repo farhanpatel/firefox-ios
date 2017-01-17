@@ -25,13 +25,24 @@ struct TopTabsUX {
 
 protocol TopTabsDelegate: class {
     func topTabsDidPressTabs()
-    func topTabsDidPressNewTab()
+    func topTabsDidPressNewTab(isPrivate: Bool)
     func topTabsDidPressPrivateModeButton()
     func topTabsDidChangeTab()
 }
 
 protocol TopTabCellDelegate: class {
     func tabCellDidClose(cell: TopTabCell)
+}
+
+class Seperator: UICollectionReusableView {
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        self.backgroundColor = UIColor.redColor()
+    }
+    
+    required init?(coder aDecoder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
 }
 
 class TopTabsViewController: UIViewController {
@@ -47,6 +58,9 @@ class TopTabsViewController: UIViewController {
         collectionView.bounces = false
         collectionView.clipsToBounds = false
         collectionView.accessibilityIdentifier = "Top Tabs View"
+
+        //collectionView.viewForFirstBaselineLayout().layer.speed = 0.1
+        //[self.collectionView.viewForBaselineLayout.layer setSpeed:0.1f];
         return collectionView
     }()
     
@@ -82,10 +96,12 @@ class TopTabsViewController: UIViewController {
 
     // Used for diffing collection view updates (animations)
     private var isUpdating = false
+    private var pendingReloadData = false
     private var _oldTabs: [Tab] = []
     private weak var _oldSelectedTab: Tab?
     private var inserts: [NSIndexPath] = []
     private var pendingUpdates: [tableUpdate] = []
+
 
     init(tabManager: TabManager) {
         self.tabManager = tabManager
@@ -175,7 +191,7 @@ class TopTabsViewController: UIViewController {
     
     func newTabTapped() {
         dispatch_async(dispatch_get_main_queue()) {
-            self.delegate?.topTabsDidPressNewTab()
+            self.delegate?.topTabsDidPressNewTab(self.isPrivate)
         }
     }
 
@@ -194,6 +210,10 @@ class TopTabsViewController: UIViewController {
             reloads = Set(reloadArr)
             inserts = Set(insertArr)
             deletes = Set(deleteArr)
+        }
+
+        func isEmpty() -> Bool {
+            return inserts.isEmpty && reloads.isEmpty && deletes.isEmpty
         }
     }
 
@@ -224,54 +244,80 @@ class TopTabsViewController: UIViewController {
 
     func updateTabsFrom(oldTabs: [Tab], to newTabs: [Tab], reloadTabs: [Tab?]) {
         assertIsMainThread("Updates can only be performed from the main thread")
-         print("\(#function) with isUpdate \(self.isUpdating)")
+
         self.pendingUpdates.append(self.calculateDiffWith(oldTabs, to: newTabs, and: reloadTabs))
-        if self.isUpdating  {
+        if self.isUpdating || self.pendingReloadData {
             return
         }
+
         self.isUpdating = true
         let updates = self.pendingUpdates
-        self.pendingUpdates = []
-         print("\(#function) before update isUpdate \(self.isUpdating)")
-        print("number of items in datastore  BEFORE UPDATE \(self.tabsToDisplay.count)")
-        let combinedUpdate = tableUpdate(updates: updates)
-        self.collectionView.performBatchUpdates({
-            self.collectionView.deleteItemsAtIndexPaths(Array(combinedUpdate.deletes))
-            self.collectionView.reloadItemsAtIndexPaths(Array(combinedUpdate.reloads))
-            self.collectionView.insertItemsAtIndexPaths(Array(combinedUpdate.inserts))
-            self.isUpdating = false
-        }) { _ in
-            if !newTabs.every({ (tab) -> Bool in return self.tabsToDisplay.indexOf(tab) != nil }) {
+        self.flushPendingChanges()
+        let update = tableUpdate(updates: updates)
+
+        performUpdateWithChanges(update) { (_) in
+            // This handles the edge case where, during the animation we've toggled private mode
+            // Because we dont have a proper way of knowing when this transition is about to happen we have to do this check here
+            if  !self.tabsMatchDisplayGroup(newTabs.first, b: self.tabsToDisplay.first) || self.pendingReloadData {
                 self.reloadData()
             }
             print("\(#function) after update isUpdate \(self.isUpdating)")
             print("number of items in datastore AFTER UPDATE \(self.tabsToDisplay.count)")
-            if self.pendingUpdates.isEmpty && !self.isUpdating && !combinedUpdate.inserts.isEmpty {
+            if self.pendingUpdates.isEmpty && !self.isUpdating && !update.inserts.isEmpty {
                 //self.scrollToCurrentTab()
             }
         }
     }
 
+    func performUpdateWithChanges(update: tableUpdate, completion: (Bool)-> Void) {
+        //Speed up the animation a bit to make it feel snappier
+        let newUpdates = update.reloads.filter { self.tabsToDisplay.count  > $0.row  }
+        UIView.animateWithDuration(0.1) {
+            self.collectionView.performBatchUpdates({
+                self.collectionView.deleteItemsAtIndexPaths(Array(update.deletes))
+                self.collectionView.reloadItemsAtIndexPaths(Array(newUpdates))
+                self.collectionView.insertItemsAtIndexPaths(Array(update.inserts))
+                self.isUpdating = false
+            }, completion: completion)
+        }
+    }
+
     private func flushPendingChanges() {
-        _oldTabs = []
-        pendingUpdates = []
+        _oldTabs.removeAll()
+        pendingUpdates.removeAll()
     }
 
     private func reloadData() {
-        print("\(#function) before update isUpdate \(self.isUpdating)")
+        assertIsMainThread("reloadData must only be called from main thread")
+        if self.isUpdating {
+            //self.pending
+            self.pendingReloadData = true
+            return
+        }
         isUpdating = true
-        collectionView.reloadData()
-        flushPendingChanges()
-        self.scrollToCurrentTab(false, centerCell: true)
-        isUpdating = false
+        self.newTab.userInteractionEnabled = false
+        print("after update we will be showing privatetabs \(isPrivate)")
+        UIView.animateWithDuration(0.2, animations: { 
+            self.collectionView.reloadData()
+            self.collectionView.collectionViewLayout.invalidateLayout()
+            self.collectionView.layoutIfNeeded()
+            }) { (_) in
+                self.flushPendingChanges()
+                self.isUpdating = false
+                self.pendingReloadData = false
+                self.newTab.userInteractionEnabled = true
+                self.privateModeButton.userInteractionEnabled = true
+        }
     }
 
     func togglePrivateModeTapped() {
         //Block any animations that might start 
         //For example adding a new private tab shouldnt trigger an update
-        print("\(#function) with isUpdate \(self.isUpdating)")
-        self.isUpdating = true
-
+        if isUpdating || pendingReloadData {
+            return
+        }
+//        self.privateModeButton.userInteractionEnabled = false
+        self.pendingReloadData = true
         let oldSelectedTab = self._oldSelectedTab
         self._oldSelectedTab = tabManager.selectedTab
         self.privateModeButton.setSelected(isPrivate, animated: true)
@@ -291,19 +337,11 @@ class TopTabsViewController: UIViewController {
         }
     }
 
-    /*
-     order of events
-     //delete last tab
-     //create a new tab
-     //select the new tab
-     //fire the reloadFavicons
-     //reload for private mode
- */
-
     func reloadFavicons(notification: NSNotification) {
         dispatch_async(dispatch_get_main_queue()) {
             if let tab = notification.object as? Tab {
-                self.updateTabsFrom(self.tabsToDisplay, to: self.tabsToDisplay, reloadTabs: [tab])
+                print("\(#function) triggering update")
+             //   self.updateTabsFrom(self.tabsToDisplay, to: self.tabsToDisplay, reloadTabs: [tab])
             }
         }
 
@@ -417,13 +455,32 @@ extension TopTabsViewController : WKNavigationDelegate {
 }
 
 extension TopTabsViewController: TabManagerDelegate {
-    func tabManager(tabManager: TabManager, didSelectedTabChange selected: Tab?, previous: Tab?) {
-         print("\(#function) with isUpdate \(self.isUpdating)")
-        if selected?.isPrivate != previous?.isPrivate && previous != nil {
+
+    // Because we don't know when we are about to transition to private mode
+    // check to make sure that the tab we are trying to add is being added to the right tab group
+    private func tabsMatchDisplayGroup(a: Tab?, b: Tab?) -> Bool {
+        if let a = a, let b = b where a.isPrivate == b.isPrivate {
+            return true
+        }
+        return false
+    }
+
+    func tabManager(tabManager: TabManager, didTogglePrivateTabs isPrivate: Bool) {
+        if isPrivate == self.isPrivate {
             self.reloadData()
+        }
+    }
+
+    func tabManager(tabManager: TabManager, didSelectedTabChange selected: Tab?, previous: Tab?) {
+
+        if self.tabManager.isRestoring {
             return
         }
-        if selected?.isPrivate == previous?.isPrivate && !self.tabManager.isRestoring {
+
+        if !tabsMatchDisplayGroup(selected, b: previous) {
+        } else {
+            print("about to update \(#function)")
+            //also update the tabs around these 2 so seperators update :/ super lame
             self.updateTabsFrom(self.tabsToDisplay, to: self.tabsToDisplay, reloadTabs: [selected, previous])
         }
     }
@@ -433,15 +490,15 @@ extension TopTabsViewController: TabManagerDelegate {
     }
 
     func tabManager(tabManager: TabManager, didAddTab tab: Tab) {
-        if self.tabManager.isRestoring {
-            return
-        }
-         print("\(#function) with isUpdate \(self.isUpdating)")
-        if tabManager.selectedTab != nil && tab.isPrivate != tabManager.selectedTab?.isPrivate {
+        assertIsMainThread("addTab from main thread")
+        if self.tabManager.isRestoring || tab.isPrivate != isPrivate {
             return
         }
         let oldTabs = _oldTabs
         _oldTabs = []
+        print("tab is tab. \(tab.isPrivate)")
+
+        print("about to update \(#function)")
         self.updateTabsFrom(oldTabs, to: self.tabsToDisplay, reloadTabs: [self.tabManager.selectedTab])
     }
 
@@ -455,11 +512,15 @@ extension TopTabsViewController: TabManagerDelegate {
             _oldSelectedTab = nil
         }
         _oldTabs = []
+        // reload the next tab 
+        print("about to update \(#function)")
         self.updateTabsFrom(oldTabs, to: self.tabsToDisplay, reloadTabs: [])
     }
 
     func tabManagerDidRestoreTabs(tabManager: TabManager) {
-        self.reloadData()
+        print("about to reload \(#function)")
+        self.collectionView.reloadData()
+       // self.reloadData()
     }
     func tabManagerDidAddTabs(tabManager: TabManager) {}
     func tabManagerDidRemoveAllTabs(tabManager: TabManager, toast: ButtonToast?) {}

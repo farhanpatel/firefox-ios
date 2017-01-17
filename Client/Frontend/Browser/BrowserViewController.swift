@@ -2044,6 +2044,10 @@ extension BrowserViewController: TabManagerDelegate {
 
     }
 
+    func tabManager(tabManager: TabManager, didTogglePrivateTabs isPrivate: Bool) {
+
+    }
+
     func tabManager(tabManager: TabManager, didSelectedTabChange selected: Tab?, previous: Tab?) {
         // Remove the old accessibilityLabel. Since this webview shouldn't be visible, it doesn't need it
         // and having multiple views with the same label confuses tests.
@@ -2058,7 +2062,7 @@ extension BrowserViewController: TabManagerDelegate {
 
         if let tab = selected, webView = tab.webView {
             updateURLBarDisplayURL(tab)
-
+            print("apllying tab is tab.isPrivate \(tab.isPrivate)")
             if tab.isPrivate {
                 readerModeCache = MemoryReaderModeCache.sharedInstance
                 applyTheme(Theme.PrivateMode)
@@ -3266,6 +3270,7 @@ extension BrowserViewController: Themeable {
         urlBar.applyTheme(themeName)
         toolbar?.applyTheme(themeName)
         readerModeBar?.applyTheme(themeName)
+
         topTabsViewController?.applyTheme(themeName)
 
         switch(themeName) {
@@ -3411,8 +3416,7 @@ extension BrowserViewController: TopTabsDelegate {
         self.urlBarDidPressTabs(urlBar)
     }
     
-    func topTabsDidPressNewTab() {
-        let isPrivate = tabManager.selectedTab?.isPrivate ?? false
+    func topTabsDidPressNewTab(isPrivate: Bool) {
         openURLInNewTab(nil, isPrivate: isPrivate, isPrivileged: true)
     }
 

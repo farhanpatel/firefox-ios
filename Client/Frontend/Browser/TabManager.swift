@@ -15,6 +15,8 @@ protocol TabManagerDelegate: class {
     func tabManager(tabManager: TabManager, didAddTab tab: Tab)
     func tabManager(tabManager: TabManager, willRemoveTab tab: Tab)
     func tabManager(tabManager: TabManager, didRemoveTab tab: Tab)
+    func tabManager(tabManager: TabManager, didTogglePrivateTabs isPrivate: Bool)
+
     func tabManagerDidRestoreTabs(tabManager: TabManager)
     func tabManagerDidAddTabs(tabManager: TabManager)
     func tabManagerDidRemoveAllTabs(tabManager: TabManager, toast: ButtonToast?)
@@ -188,6 +190,12 @@ class TabManager: NSObject {
 
         for delegate in delegates {
             delegate.get()?.tabManager(self, didSelectedTabChange: tab, previous: previous)
+        }
+
+        if let sel = selectedTab, let prev = previous where sel.isPrivate != prev.isPrivate {
+            for delegate in delegates {
+                delegate.get()?.tabManager(self, didTogglePrivateTabs: sel.isPrivate)
+            }
         }
     }
 

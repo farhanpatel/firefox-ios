@@ -142,15 +142,15 @@ class TopTabCell: UICollectionViewCell {
         guard seperatorLine else {
             return
         }
-        guard let context = UIGraphicsGetCurrentContext() else { return }
-        CGContextSaveGState(context)
-        CGContextSetLineCap(context, CGLineCap.Square)
-        CGContextSetStrokeColorWithColor(context, UIColor.whiteColor().colorWithAlphaComponent(0.2).CGColor)
-        CGContextSetLineWidth(context, 1.0)
-        CGContextMoveToPoint(context, 0, TopTabsUX.BackgroundSeparatorLinePadding)
-        CGContextAddLineToPoint(context, 0, frame.size.height-TopTabsUX.BackgroundSeparatorLinePadding)
-        CGContextStrokePath(context)
-        CGContextRestoreGState(context)
+//        guard let context = UIGraphicsGetCurrentContext() else { return }
+//        CGContextSaveGState(context)
+//        CGContextSetLineCap(context, CGLineCap.Square)
+//        CGContextSetStrokeColorWithColor(context, UIColor.whiteColor().colorWithAlphaComponent(0.2).CGColor)
+//        CGContextSetLineWidth(context, 1.0)
+//        CGContextMoveToPoint(context, 0, TopTabsUX.BackgroundSeparatorLinePadding)
+//        CGContextAddLineToPoint(context, 0, frame.size.height-TopTabsUX.BackgroundSeparatorLinePadding)
+//        CGContextStrokePath(context)
+//        CGContextRestoreGState(context)
     }
 }
 

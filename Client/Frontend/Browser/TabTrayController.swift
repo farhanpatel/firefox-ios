@@ -683,6 +683,9 @@ extension TabTrayController: TabManagerDelegate {
     func tabManager(tabManager: TabManager, didSelectedTabChange selected: Tab?, previous: Tab?) {
     }
 
+    func tabManager(tabManager: TabManager, didTogglePrivateTabs isPrivate: Bool) {
+
+    }
 
     func tabManager(tabManager: TabManager, willTogglePrivateMode isPrivate: Bool) {
 
