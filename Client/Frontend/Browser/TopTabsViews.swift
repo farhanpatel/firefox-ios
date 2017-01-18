@@ -70,7 +70,6 @@ class TopTabCell: UICollectionViewCell {
     private let bezierView: BezierView = {
         let bezierView = BezierView()
         bezierView.fillColor = TopTabsUX.TopTabsBackgroundNormalColorInactive
-
         return bezierView
     }()
     
@@ -272,7 +271,6 @@ class TopTabsBackgroundDecorationView: UICollectionReusableView {
         
         override func drawRect(rect: CGRect) {
             super.drawRect(rect)
-
             let bezierPath = UIBezierPath.topTabsCurve(frame.width, height: frame.height, direction: right ? .Right : .Left)
             themeColor.setFill()
             bezierPath.fill()
