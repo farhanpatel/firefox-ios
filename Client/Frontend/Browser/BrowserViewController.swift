@@ -18,7 +18,6 @@ import WebImage
 
 private let log = Logger.browserLogger
 
-
 private let KVOLoading = "loading"
 private let KVOEstimatedProgress = "estimatedProgress"
 private let KVOURL = "URL"
@@ -1254,7 +1253,7 @@ class BrowserViewController: UIViewController {
 
     override var keyCommands: [UIKeyCommand]? {
         return [
-            UIKeyCommand(input: "t", modifierFlags: .Command, action: #selector(BrowserViewController.reloadTab), discoverabilityTitle: Strings.ReloadPageTitle),
+            UIKeyCommand(input: "r", modifierFlags: .Command, action: #selector(BrowserViewController.reloadTab), discoverabilityTitle: Strings.ReloadPageTitle),
             UIKeyCommand(input: "[", modifierFlags: .Command, action: #selector(BrowserViewController.goBack), discoverabilityTitle: Strings.BackTitle),
             UIKeyCommand(input: UIKeyInputLeftArrow, modifierFlags: .Command, action: #selector(BrowserViewController.goBack), discoverabilityTitle: Strings.BackTitle),
             UIKeyCommand(input: "]", modifierFlags: .Command, action: #selector(BrowserViewController.goForward), discoverabilityTitle: Strings.ForwardTitle),
@@ -1262,7 +1261,7 @@ class BrowserViewController: UIViewController {
 
             UIKeyCommand(input: "f", modifierFlags: .Command, action: #selector(BrowserViewController.findOnPage), discoverabilityTitle: Strings.FindTitle),
             UIKeyCommand(input: "l", modifierFlags: .Command, action: #selector(BrowserViewController.selectLocationBar), discoverabilityTitle: Strings.SelectLocationBarTitle),
-            UIKeyCommand(input: "r", modifierFlags: .Command, action: #selector(BrowserViewController.newTab), discoverabilityTitle: Strings.NewTabTitle),
+            UIKeyCommand(input: "t", modifierFlags: .Command, action: #selector(BrowserViewController.newTab), discoverabilityTitle: Strings.NewTabTitle),
             UIKeyCommand(input: "p", modifierFlags: [.Command, .Shift], action: #selector(BrowserViewController.newPrivateTab), discoverabilityTitle: Strings.NewPrivateTabTitle),
             UIKeyCommand(input: "w", modifierFlags: .Command, action: #selector(BrowserViewController.closeTab), discoverabilityTitle: Strings.CloseTabTitle),
             UIKeyCommand(input: "\t", modifierFlags: .Control, action: #selector(BrowserViewController.nextTab), discoverabilityTitle: Strings.ShowNextTabTitle),
@@ -2034,19 +2033,6 @@ extension BrowserViewController: SearchViewControllerDelegate {
 
 extension BrowserViewController: TabManagerDelegate {
 
-    func tabManager(tabManager: TabManager, willTogglePrivateMode isPrivate: Bool) {
-
-    }
-
-
-    func tabManager(tabManager: TabManager, didTogglePrivateMode isPrivate: Bool) {
-
-    }
-
-    func tabManager(tabManager: TabManager, didTogglePrivateTabs isPrivate: Bool) {
-
-    }
-
     func tabManager(tabManager: TabManager, didSelectedTabChange selected: Tab?, previous: Tab?) {
         // Remove the old accessibilityLabel. Since this webview shouldn't be visible, it doesn't need it
         // and having multiple views with the same label confuses tests.
@@ -2061,7 +2047,6 @@ extension BrowserViewController: TabManagerDelegate {
 
         if let tab = selected, webView = tab.webView {
             updateURLBarDisplayURL(tab)
-            print("apllying tab is tab.isPrivate \(tab.isPrivate)")
             if tab.isPrivate {
                 readerModeCache = MemoryReaderModeCache.sharedInstance
                 applyTheme(Theme.PrivateMode)
@@ -3250,7 +3235,6 @@ extension BrowserViewController: TabTrayDelegate {
         guard let url = tab.url?.absoluteString where url.characters.count > 0 else { return }
         self.addBookmark(tab.tabState)
     }
-
 
     func tabTrayDidAddToReadingList(tab: Tab) -> ReadingListClientRecord? {
         guard let url = tab.url?.absoluteString where url.characters.count > 0 else { return nil }
