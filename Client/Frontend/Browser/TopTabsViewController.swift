@@ -187,7 +187,7 @@ class TopTabsViewController: UIViewController {
         if isUpdating || pendingReloadData {
             return
         }
-
+        delegate?.topTabsDidPressPrivateModeButton()
         self.pendingReloadData = true
         let oldSelectedTab = self._oldSelectedTab
         self._oldSelectedTab = tabManager.selectedTab
@@ -457,6 +457,7 @@ extension TopTabsViewController: TabManagerDelegate {
         } else {
             print("about to update \(#function)")
             self.updateTabsFrom(self.tabsToDisplay, to: self.tabsToDisplay, reloadTabs: [selected, previous])
+            delegate?.topTabsDidChangeTab()
         }
     }
 
