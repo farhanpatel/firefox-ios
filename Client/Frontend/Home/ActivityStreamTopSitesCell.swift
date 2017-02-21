@@ -121,22 +121,23 @@ class TopSiteItemCell: UICollectionViewCell {
         titleLabel.text = ""
     }
 
-    fileprivate func setImageWithURL(_ url: URL) {
-        let title = self.titleLabel.text
-        imageView.sd_setImage(with: url) { [unowned self] (img, err, type, url) -> Void in
-            guard let img = img else {
-                self.contentView.backgroundColor = FaviconFetcher.getDefaultColor(url!)
-                self.imageView.image = FaviconFetcher.getDefaultFavicon(url!)
-                return
-            }
-            img.getColors(scaleDownSize: CGSize(width: 25, height: 25)) {colors in
-                //sometimes the cell could be reused by the time we get here.
-                if title == self.titleLabel.text {
-                    self.contentView.backgroundColor = colors.backgroundColor ?? UIColor.lightGray
-                }
-            }
-        }
-    }
+//    fileprivate func setImageWithURL(_ url: URL) {
+//        let title = self.titleLabel.text
+//
+//        imageView.sd_setImage(with: url) { [unowned self] (img, err, type, url) -> Void in
+//            guard let img = img else {
+//                self.contentView.backgroundColor = FaviconFetcher.getDefaultColor(url!)
+//                self.imageView.image = FaviconFetcher.getDefaultFavicon(url!)
+//                return
+//            }
+//            img.getColors(scaleDownSize: CGSize(width: 25, height: 25)) {colors in
+//                //sometimes the cell could be reused by the time we get here.
+//                if title == self.titleLabel.text {
+//                    self.contentView.backgroundColor = colors.backgroundColor ?? UIColor.lightGray
+//                }
+//            }
+//        }
+//    }
 
     func configureWithTopSiteItem(_ site: Site) {
         titleLabel.text = site.tileURL.hostSLD
@@ -148,13 +149,11 @@ class TopSiteItemCell: UICollectionViewCell {
             // Once we remove the old TopSitesPanel we can change the values of amazon/wikipedia to be white instead of black.
             contentView.backgroundColor = suggestedSite.backgroundColor.isBlackOrWhite ? UIColor.white : suggestedSite.backgroundColor
         } else {
-            guard let url = site.icon?.url, let favURL = url.asURL else {
-                let siteURL = site.url.asURL!
-                self.contentView.backgroundColor = FaviconFetcher.getDefaultColor(siteURL)
-                self.imageView.image = FaviconFetcher.getDefaultFavicon(siteURL)
-                return
-            }
-            setImageWithURL(favURL)
+            imageView.setFavicon(site, completed: { (color, url) in
+                if let url = url, url == site.tileURL {
+                    self.contentView.backgroundColor = color
+                }
+            })
         }
     }
 

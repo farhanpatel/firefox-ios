@@ -333,7 +333,11 @@ class HistoryPanelSiteTableViewController: SiteTableViewController {
         if let site = siteForIndexPath(indexPath) {
             if let cell = cell as? TwoLineTableViewCell {
                 cell.setLines(site.title, detailText: site.url)
-                cell.imageView?.setIcon(site.icon, forURL: site.tileURL)
+                cell.imageView?.setIcon(site.icon, forURL: site.tileURL, completed: { (color, url) in
+                    if let url = url, url == site.tileURL {
+                        cell.imageView?.backgroundColor = color
+                    }
+                })
             }
         }
 

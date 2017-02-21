@@ -5,7 +5,7 @@
 import UIKit
 
 class SettingsNavigationController: UINavigationController {
-    var popoverDelegate: PresentingModalViewControllerDelegate?
+    var popoverDelegate: (PresentingModalViewControllerDelegate & SettingsDelegate)?
 
     func SELdone() {
         if let delegate = popoverDelegate {

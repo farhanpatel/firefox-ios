@@ -9,6 +9,7 @@ import XCGLogger
 import Deferred
 import WebImage
 import Fuzi
+import SwiftyJSON
 
 private let log = Logger.browserLogger
 private let queue = DispatchQueue(label: "FaviconFetcher", attributes: DispatchQueue.Attributes.concurrent)
@@ -30,6 +31,21 @@ open class FaviconFetcher: NSObject, XMLParserDelegate {
     fileprivate static var characterToFaviconCache = [String: UIImage]()
     static var defaultFavicon: UIImage = {
         return UIImage(named: "defaultFavicon")!
+    }()
+
+    static var colors: [String: UIColor] = [:]
+    static var defaultIcons: [String: (color: UIColor, url: String)] = {
+        let filePath = Bundle.main.path(forResource: "top_sites", ofType: "json")
+        let file = try! Data(contentsOf: URL(fileURLWithPath: filePath!))
+        let json = JSON(file)
+        var icons: [String: (color: UIColor, url: String)] = [:]
+        json.forEach({
+            guard let url = $0.1["domain"].string, let color = $0.1["background_color"].string, let path = $0.1["image_url"].string else {
+                return
+            }
+            icons[url] = (UIColor(colorString: color.replacingOccurrences(of: "#", with: "")), path)
+        })
+        return icons
     }()
 
     class func getForURL(_ url: URL, profile: Profile) -> Deferred<Maybe<[Favicon]>> {
@@ -176,6 +192,7 @@ open class FaviconFetcher: NSObject, XMLParserDelegate {
         let url = icon.url
         let manager = SDWebImageManager.shared()
         let site = Site(url: siteUrl.absoluteString, title: "")
+
 
         var fav = Favicon(url: url, type: icon.type)
         if let url = url.asURL {

@@ -51,11 +51,13 @@ open class Favicon: Identifiable {
     open var width: Int?
     open var height: Int?
     open let type: IconType
+    open let color: UIColor
 
-    public init(url: String, date: Date = Date(), type: IconType) {
+    public init(url: String, date: Date = Date(), type: IconType, color: UIColor = .clear) {
         self.url = url
         self.date = date
         self.type = type
+        self.color = color
     }
 }
 

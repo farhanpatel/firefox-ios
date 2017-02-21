@@ -5,22 +5,66 @@
 import UIKit
 import Storage
 import WebImage
+import Shared
 
 public extension UIImageView {
 
-    public func setIcon(_ icon: Favicon?, forURL url: URL?) {
-        self.backgroundColor = UIColor.clear
-        setDefaultIcon(url)
-        guard let icon = icon else {
-            return
-        }
-        let imageURL = URL(string: icon.url)
-        self.sd_setHighlightedImage(with: imageURL, options: []) { (img, error, type, url) in
-            guard let image = img else {
-                return
+    public func setIcon(_ icon: Favicon?, forURL url: URL?, completed completionBlock: ((UIColor, URL?) -> Void)? = nil ) {
+        if let siteURL = url?.baseDomain, let defaultIcon = FaviconFetcher.defaultIcons[siteURL] {
+            let filePath = Bundle.main.path(forResource: "TopSites/" + defaultIcon.url.replacingOccurrences(of: ".png", with: ""), ofType: "png")
+            self.image = UIImage(contentsOfFile: filePath!)
+            DispatchQueue.main.async {
+                completionBlock?(defaultIcon.color, url)
             }
-            self.image = image
-            self.backgroundColor = UIColor.white
+        } else {
+            let imageURL = URL(string: icon?.url ?? "")
+            let defaults = defaultFavicon(url)
+            self.sd_setImage(with: imageURL, placeholderImage: defaults.image, options: []) {(img, err, _, _) in
+                guard let image = img, let dUrl = url, err == nil else {
+                    completionBlock?(defaults.color, url)
+                    return
+                }
+                self.colorFor(image: image, andURL: dUrl, completed: completionBlock)
+            }
+        }
+
+    }
+
+    private func colorFor(image: UIImage, andURL url: URL, completed completionBlock: ((UIColor, URL?) -> Void)? = nil) {
+        // The completion block usually contains UI related code. So make sure it happens on the main thread.
+        if let color = FaviconFetcher.colors[url.absoluteString] {
+            DispatchQueue.main.async {
+                completionBlock?(color, url)
+            }
+        } else {
+            image.getColors(scaleDownSize: CGSize(width: 25, height: 25)) {colors in
+                DispatchQueue.main.async {
+                    completionBlock?(colors.backgroundColor, url)
+                }
+                FaviconFetcher.colors[url.absoluteString] = colors.backgroundColor
+            }
+        }
+    }
+
+    public func setFavicon(_ site: Site, completed completionBlock: ((UIColor, URL?) -> Void)? = nil ) {
+        if let defaultIcon = FaviconFetcher.defaultIcons[site.tileURL.absoluteString] {
+            let url = defaultIcon.url.replacingOccurrences(of: ".png", with: "")
+            let filePath = Bundle.main.path(forResource: "TopSites/" + url, ofType: "png")
+            self.image = UIImage(contentsOfFile: filePath!)
+            DispatchQueue.main.async {
+                completionBlock?(defaultIcon.color, site.tileURL)
+            }
+        } else {
+            self.setIcon(site.icon, forURL: site.tileURL, completed: completionBlock)
+        }
+
+    }
+
+    fileprivate func defaultFavicon(_ url: URL?) -> (image: UIImage, color: UIColor) {
+        if let url = url {
+            return (FaviconFetcher.getDefaultFavicon(url), FaviconFetcher.getDefaultColor(url))
+        } else {
+            return (FaviconFetcher.defaultFavicon, .white)
         }
     }
 
@@ -32,7 +76,6 @@ public extension UIImageView {
             self.image = FaviconFetcher.defaultFavicon
             self.backgroundColor = UIColor.white
         }
-        self.highlightedImage = self.image
     }
 }
 
