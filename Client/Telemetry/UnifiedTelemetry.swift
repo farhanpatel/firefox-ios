@@ -32,30 +32,30 @@ class UnifiedTelemetry {
         telemetryConfig.measureUserDefaultsSetting(forKey: "profile.prefkey.trackingprotection.strength", withDefaultValue: "basic")
 
         let prefs = profile.prefs
-        Telemetry.default.beforeSerializePing(pingType: CorePingBuilder.PingType) { (inputDict) -> [String: Any?] in
-            var outputDict = inputDict // make a mutable copy
-            if let newTabChoice = prefs.stringForKey(NewTabAccessors.PrefKey) {
-                outputDict["defaultNewTabExperience"] = newTabChoice as AnyObject?
-            }
-            if let chosenEmailClient = prefs.stringForKey(PrefsKeys.KeyMailToOption) {
-                outputDict["defaultMailClient"] = chosenEmailClient as AnyObject?
-            }
-            return outputDict
-        }
-
-        Telemetry.default.beforeSerializePing(pingType: MobileEventPingBuilder.PingType) { (inputDict) -> [String : Any?] in
-            var outputDict = inputDict
-            var settings: [String : Any?] = inputDict["settings"] as? [String : Any?] ?? [:]
-
-            let searchEngines = SearchEngines(prefs: profile.prefs, files: profile.files)
-            settings["defaultSearchEngine"] = searchEngines.defaultEngine.engineID ?? "custom"
-
-            outputDict["settings"] = settings
-            return outputDict
-        }
-        
-        Telemetry.default.add(pingBuilderType: CorePingBuilder.self)
-        Telemetry.default.add(pingBuilderType: MobileEventPingBuilder.self)
+//        Telemetry.default.beforeSerializePing(pingType: CorePingBuilder.PingType) { (inputDict) -> [String: Any?] in
+//            var outputDict = inputDict // make a mutable copy
+//            if let newTabChoice = prefs.stringForKey(NewTabAccessors.PrefKey) {
+//                outputDict["defaultNewTabExperience"] = newTabChoice as AnyObject?
+//            }
+//            if let chosenEmailClient = prefs.stringForKey(PrefsKeys.KeyMailToOption) {
+//                outputDict["defaultMailClient"] = chosenEmailClient as AnyObject?
+//            }
+//            return outputDict
+//        }
+//
+//        Telemetry.default.beforeSerializePing(pingType: MobileEventPingBuilder.PingType) { (inputDict) -> [String : Any?] in
+//            var outputDict = inputDict
+//            var settings: [String : Any?] = inputDict["settings"] as? [String : Any?] ?? [:]
+//
+//            let searchEngines = SearchEngines(prefs: profile.prefs, files: profile.files)
+//            settings["defaultSearchEngine"] = searchEngines.defaultEngine.engineID ?? "custom"
+//
+//            outputDict["settings"] = settings
+//            return outputDict
+//        }
+//
+//        Telemetry.default.add(pingBuilderType: CorePingBuilder.self)
+//        Telemetry.default.add(pingBuilderType: MobileEventPingBuilder.self)
     }
 
     @objc func uploadError(notification: NSNotification) {

@@ -6,66 +6,61 @@ import Foundation
 import Shared
 import SwiftyJSON
 
-open class SearchEnginesJSON {
-    fileprivate let json: JSON
+/*
+ This only makes sense if you look at the structure of List.json
+*/
+class DefaultSearchPrefs {
+    fileprivate let defaultSearchList: [String] //The global defaults
+    fileprivate let locales: JSON
+    fileprivate let regionOverrides: JSON
+    fileprivate let globalDefaultEngine: String
 
-    public init(_ jsonString: String) {
-        self.json = JSON(parseJSON: jsonString)
+    public init?(with filePath: URL) {
+        guard let searchManifest = try? String(contentsOf: filePath) else {
+            assertionFailure("Search list not found. Check bundle")
+            return nil
+        }
+        let json = JSON(parseJSON: searchManifest)
+        // Split up the JSON into useful parts
+        locales = json["locales"]
+        regionOverrides = json["regionOverrides"]
+        // These are the fallback defaults
+        guard let searchList = json["default"]["visibleDefaultEngines"].array?.flatMap({ $0.string }),
+            let engine = json["default"]["searchDefault"].string else {
+                assertionFailure("Defaults are not set up correctly in List.json")
+                return nil
+        }
+        defaultSearchList = searchList
+        globalDefaultEngine = engine
     }
 
-    public init(_ json: JSON) {
-        self.json = json
+    /*
+     Returns an array of the visibile engines. It overrides any of the returned engines from the regionOverrides list
+     Each langauge in the locales list has a default list of engines and then a region override list.
+     */
+    open func visibleDefaultEngines(for possibileLocales: [String], and region: String) -> [String] {
+        let engineList = possibileLocales.flatMap({ locales[$0].dictionary }).flatMap({ (localDict) -> [JSON]? in
+            return localDict[region]?["visibleDefaultEngines"].array ?? localDict["default"]?["visibleDefaultEngines"].array
+        }).last?.flatMap( { $0.string }) //is last correct here?
+
+        // If the engineList is empty then go ahead and use the default
+        var usersEngineList = engineList ?? defaultSearchList
+
+        // Overrides for specfic regions.
+        if let overrides = regionOverrides[region].dictionary {
+            usersEngineList = usersEngineList.map({ overrides[$0]?.string ?? $0 })
+        }
+        return usersEngineList
     }
 
-    open func visibleDefaultEngines(possibilities: [String], region: String) -> [String] {
-        var engineNames: [JSON]? = nil
-        for possibleLocale in possibilities {
-            if let regions = json["locales"][possibleLocale].dictionary {
-                if regions[region] == nil || regions[region]!["visibleDefaultEngines"] == JSON.null {
-                    engineNames = regions["default"]!["visibleDefaultEngines"].array
-                } else {
-                    engineNames = regions[region]!["visibleDefaultEngines"].array
-                }
-                break;
-            }
+    /*
+     Returns the default search given the possible locales and region
+     The list.json locales list contains searchDefaults for a few locales.
+     Create a list of these and return the last one. The globalDefault acts as the fallback in case the list is empty.
+     */
+    open func searchDefault(for possibileLocales: [String], and region: String) -> String {
+        return possibileLocales.flatMap({ locales[$0].dictionary }).reduce(globalDefaultEngine) { (defaultEngine, localeJSON) -> String in
+            return localeJSON[region]?["searchDefault"].string ?? defaultEngine
         }
-        if engineNames == nil {
-            engineNames = json["default"]["visibleDefaultEngines"].array
-        }
-        var engineNamesArray = jsonsToStrings(engineNames)!
-        let regionOverrides = json["regionOverrides"].dictionary
-        if regionOverrides![region] != nil {
-            for (index, engineName) in engineNamesArray.enumerated() {
-                if regionOverrides![region]![engineName] != JSON.null {
-                    engineNamesArray[index] = regionOverrides![region]![engineName].string!
-                }
-            }
-            
-        }
-        return engineNamesArray
-    }
-
-    open func searchDefault(possibilities: [String], region: String) -> String {
-        var searchDefault: String? = nil
-        for possibleLocale in possibilities {
-            if let regions = json["locales"][possibleLocale].dictionary {
-                if regions[region] == nil {
-                    searchDefault = regions["default"]!["searchDefault"].string
-                } else {
-                    searchDefault = regions[region]!["searchDefault"].string
-                }
-                break;
-            }
-        }
-        if searchDefault == nil {
-            searchDefault = json["default"]["searchDefault"].string
-        }
-        return searchDefault!
-    }    
-}
-
-extension SearchEnginesJSON {
-    func asJSON() -> JSON {
-        return self.json
     }
 }

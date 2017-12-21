@@ -160,65 +160,31 @@ class SearchEngines {
     /// Return all possible language identifiers in the order of most specific to least specific.
     /// For example, zh-Hans-CN will return [zh-Hans-CN, zh-CN, zh].
     class func possibilitiesForLanguageIdentifier(_ languageIdentifier: String) -> [String] {
-        var possibilities = [String]()
-         let components = languageIdentifier.components(separatedBy: "-")
-         if components.count == 1 {
-             // zh
-            possibilities.append(languageIdentifier)
-         } else if components.count == 2 {
-             // zh-CN
-            possibilities.append(languageIdentifier)
-            possibilities.append(components[0])
-         } else if components.count == 3 {
-            possibilities.append(languageIdentifier)
-            possibilities.append(components[0] + "-" + components[2])
-            possibilities.append(components[0])
-         }
-        return possibilities;
+        var possibilities: [String] = []
+        let components = languageIdentifier.components(separatedBy: "-")
+        possibilities.append(languageIdentifier)
+
+        if components.count == 3, let first = components.first, let last = components.last {
+            possibilities.append("\(first)-\(last)")
+        }
+        if components.count >= 2, let first = components.first {
+            possibilities.append("\(first)")
+        }
+        return possibilities
     }
 
     /// Return all possible paths for a language identifier in the order of most specific to least specific.
     /// For example, zh-Hans-CN with a default of en will return [zh-Hans-CN, zh-CN, zh, en]. The fallback
     /// identifier must be a known one that is guaranteed to exist in the SearchPlugins directory.
-    class func directoriesForLanguageIdentifier(_ languageIdentifier: String, basePath: NSString, fallbackIdentifier: String) -> [String] {
+    class func directoriesFor(languageIdentifier: String, with basePath: NSString, using fallbackIdentifier: String) -> [String] {
         var directories = possibilitiesForLanguageIdentifier(languageIdentifier)
-        let components = languageIdentifier.components(separatedBy: "-")
-        if components.count == 1 {
-            // zh
-            directories.append(languageIdentifier)
-        } else if components.count == 2 {
-            // zh-CN
-            directories.append(languageIdentifier)
-            directories.append(components[0])
-        } else if components.count == 3 {
-            directories.append(languageIdentifier)
-            directories.append(components[0] + "-" + components[2])
-            directories.append(components[0])
-        }
+
         if !directories.contains(fallbackIdentifier) {
             directories.append(fallbackIdentifier)
         }
         
         return directories.map { (path) -> String in
             return basePath.appendingPathComponent(path)
-        }
-    }
-
-    // Return the language identifier to be used for the search engine selection. This returns the first
-    // identifier from preferredLanguages and takes into account that on iOS 8, zh-Hans-CN is returned as
-    // zh-Hans. In that case it returns the longer form zh-Hans-CN. Same for traditional Chinese.
-    //
-    // These exceptions can go away when we drop iOS 8 or when we start using a better mechanism for search
-    // engine selection that is not based on language identifier.
-    class func languageIdentifierForSearchEngines() -> String {
-        let languageIdentifier = Locale.preferredLanguages.first!
-        switch languageIdentifier {
-            case "zh-Hans":
-                return "zh-Hans-CN"
-            case "zh-Hant":
-                return "zh-Hant-TW"
-            default:
-                return languageIdentifier
         }
     }
 
@@ -237,48 +203,39 @@ class SearchEngines {
     /// Get all bundled (not custom) search engines, with the default search engine first,
     /// but the others in no particular order.
     class func getUnorderedBundledEngines() -> [OpenSearchEngine] {
-        let pluginBasePath: NSString = (Bundle.main.resourcePath! as NSString).appendingPathComponent("SearchPlugins") as NSString
-        let languageIdentifier = languageIdentifierForSearchEngines()
+        let languageIdentifier = Locale.preferredLanguages.first ?? "en-US"
+        let parser = OpenSearchParser(pluginMode: true)
 
-        let index = (pluginBasePath as NSString).appendingPathComponent("list.json")
-        let listFile = try! String(contentsOfFile: index, encoding: String.Encoding.utf8)
-        let engineJSON = SearchEnginesJSON(listFile)
+        guard let pluginDirectory = Bundle.main.resourceURL?.appendingPathComponent("SearchPlugins") else {
+            assertionFailure("Search plugins not found. Check bundle")
+            return []
+        }
 
+        let filePath = pluginDirectory.appendingPathComponent("list.json")
+
+        guard let defaultSearchPrefs = DefaultSearchPrefs(with: filePath) else {
+            assertionFailure("Failed to parse List.json")
+            return []
+        }
         let possibilities = possibilitiesForLanguageIdentifier(languageIdentifier)
         let region = regionIdentifierForSearchEngines(languageIdentifier)
-        let engineNames = engineJSON.visibleDefaultEngines(possibilities: possibilities, region: region)
-        let searchDefault = engineJSON.searchDefault(possibilities: possibilities, region: region)
+        let engineNames = defaultSearchPrefs.visibleDefaultEngines(for: possibilities, and: region)
+        let defaultEngineName = defaultSearchPrefs.searchDefault(for: possibilities, and: region)
 
         assert(engineNames.count > 0, "No search engines")
 
-        var engines = [OpenSearchEngine]()
-        let parser = OpenSearchParser(pluginMode: true)
-         for engineName in engineNames {
-             // Search the current localized search plugins directory for the search engine.
-             // If it doesn't exist, fall back to English.
-            let fullPath = (pluginBasePath as NSString).appendingPathComponent("\(engineName).xml")
-            // If a search engine doesn't exist, just ignore it. We might have entries in
-            // list.json where the files don't exist yet.
-            if (!FileManager.default.fileExists(atPath: fullPath)) {
-                continue
-             }
-
-            guard let engine = parser.parse(fullPath, engineID: engineName) else {
-                log.error("Failed to parse search engine ID \(engineName) at \(fullPath)")
-                continue
-            }
-            engines.append(engine)
-        }
-
-        let defaultEngineName = searchDefault;
-
-        return engines.sorted { e, _ in e.shortName == defaultEngineName }
+        return engineNames.map({ (name: $0, path: pluginDirectory.appendingPathComponent("\($0).xml").absoluteString) })
+            .filter({ FileManager.default.fileExists(atPath: $0.path) })
+            .flatMap({ parser.parse($0.path, engineID: $0.name) })
+            .sorted { e, _ in e.shortName == defaultEngineName }
     }
 
     /// Get all known search engines, possibly as ordered by the user.
     fileprivate func getOrderedEngines() -> [OpenSearchEngine] {
         let unorderedEngines = customEngines + SearchEngines.getUnorderedBundledEngines()
 
+        // might not work to change the default.
+        // if someone has added/removed an engine new engines or edits to the default engines might never be shown.
         guard let orderedEngineNames = prefs.stringArrayForKey(OrderedEngineNames) else {
             // We haven't persisted the engine order, so return whatever order we got from disk.
             return unorderedEngines
